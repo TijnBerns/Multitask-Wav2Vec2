@@ -1,17 +1,12 @@
-from ast import Assert
-import os
+
 from pathlib import Path
 from pprint import pprint
 import torchaudio
 import torch
-import itertools
 import random
 from tqdm import tqdm
-
-import numpy as np
-
 from config import Config
-import data as data
+
 
 
 def generate_no_repeat(dataset: torchaudio.datasets.LIBRISPEECH, idxss: list, n_speakers: int):
@@ -145,4 +140,4 @@ if __name__ == "__main__":
 
     sample_pairs = generate_sample_pairs(dev_ds, generate_no_repeat)
     merged_pairs = merge_pairs(sample_pairs)
-    save_pairs('../data/test', merged_pairs)
+    save_pairs(Config.datapath + "/test", merged_pairs)

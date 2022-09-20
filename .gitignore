@@ -1,11 +1,12 @@
 
 data
 /data
-models
-/models
+# models
+# /models
 logs
 /logs
-
+venv
+/venv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

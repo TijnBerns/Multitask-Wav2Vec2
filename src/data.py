@@ -4,10 +4,6 @@ from pathlib import Path
 import torchaudio
 from config import Config
 from torch.nn.utils.rnn import pad_sequence
-from torch.utils.data import random_split
-from torch.utils.data import Dataset, DataLoader
-import pandas as pd
-from tqdm import tqdm
 
 
 def load_sample(path: Path):
@@ -50,16 +46,6 @@ class CustomLibriSpeechDataset(Dataset):
             samples[i] = load_sample(file_name)
         return samples
     
-    # def _load_transcriptions(self, root_dir):
-    #     file_names = Path(root_dir).rglob("*.trans.txt")
-    #     transcriptions = {}
-    #     for trans_file in file_names:
-    #         with open(trans_file)as f: 
-    #             [line.split(' ', 1) for line in f.readlines()]
-    #             transcriptions.update()
-            
-        
-
     def __len__(self):
         return len(self.samples)
 

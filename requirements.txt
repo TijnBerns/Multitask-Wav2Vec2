@@ -1,0 +1,11 @@
+
+torch
+torchaudio
+
+transformers
+datasets
+soundfile
+librosa
+plotly
+jiwer
+pydub
