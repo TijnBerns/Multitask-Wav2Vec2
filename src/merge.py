@@ -6,30 +6,18 @@ import torch
 import random
 from tqdm import tqdm
 from config import Config
+import data
 
 
-def gen_sample_dict(root: Path, dataset: torchaudio.datasets.LIBRISPEECH):
-    # sample_dict = {}
+def get_speaker_dict(dataset: torchaudio.datasets.LIBRISPEECH):
     speaker_dict = {}
-    # speaker_set = set()
 
     for i, sample in tqdm(enumerate(dataset), desc="Generating sample dictionary"):
-        # Find sample path in root folder
-        # sample_paths = list(root.rglob(
-        #     f"{sample[3]}/{sample[4]}/*{str(sample[5]).zfill(4)}.flac"))
-        # sample_path = sample_paths[0]
-
-        # Add to dict and set
-        # sample_dict[str(sample_path)] = i
-
         if speaker_dict.get(str(sample[3]), -1) == -1:
             speaker_dict[str(sample[3])] = [i]
         else:
             speaker_dict[str(sample[3])].append(i)
 
-        # speaker_set.add(sample[3])
-
-    # return sample_dict, speaker_dict, list(speaker_set)
     return speaker_dict
 
 
@@ -70,8 +58,8 @@ def gen_pair_no_repeat(dataset: torchaudio.datasets.LIBRISPEECH, speaker_dict: l
 
 
 def gen_pairs(dataset, num_samples: int, max_tokens: int, max_attempts: int):
-    root = Path(dataset._path)
-    speaker_dict = gen_sample_dict(root, dataset)
+
+    speaker_dict = get_speaker_dict(dataset)
 
     sample_pairs = []
     n = 0
@@ -163,16 +151,23 @@ def write_trans_file(root: Path, id1: str, id2: str, id3: str, transcription: st
 
 def main():
     root = Path(Config.datapath)
-    for url, save_loc in [("dev-clean", "dev-clean-no-rep"),
-                          ("test-clean", "test-clean-no-rep"),
-                          ("train-clean-100", "train-clean-no-rep")]:
 
-        print(f"Merging samples of {url}...")
-        dataset = torchaudio.datasets.LIBRISPEECH(
-            root, url=url, download=True)
+    tmp_train_set = torchaudio.datasets.LIBRISPEECH(
+        root, url="train-clean-100", download=True)
+    train_set, val_set = data.split_dataset(tmp_train_set, 0.7)
+    test_set = torchaudio.datasets.LIBRISPEECH(
+        root, url="test-clean", download=True)
+    dev_set = torchaudio.datasets.LIBRISPEECH(
+        root, url="dev-clean", download=True)
 
-        pairs = gen_pairs(dataset=dataset, max_tokens=Config.max_tokens, max_attempts=Config.max_attempts, num_samples=Config.num_samples,
-                          )
+    for dataset, save_loc, num_samples in [(dev_set, "dev-clean-no-rep", 1000),
+                                           (test_set, "test-clean-no-rep", 1000),
+                                           (val_set, "val-clean-no-rep", 1000),
+                                           (train_set, "train-clean-no-rep", 5000)]:
+
+        print(f"Merging samples of {dataset}...")
+        pairs = gen_pairs(dataset=dataset, max_tokens=Config.max_tokens,
+                          max_attempts=Config.max_attempts, num_samples=num_samples)
         merged_pairs = merge_pairs(pairs)
         save_pairs(root / save_loc, merged_pairs)
 

@@ -11,11 +11,13 @@ class LirbriSpeechItem(object):
     def __init__(self, file_name: Path, transcription: str, ids: list):
         self.file_name = file_name
         self.transcription = transcription
-        self.ids = ids
+        self.id1 = ids[0]
+        self.id2 = ids[1]
+        self.id3 = ids[2]
 
     def load_sample(self):
         waveform, sample_rate = torchaudio.load(self.file_name)
-        return (waveform, sample_rate, self.transcription, *self.ids)
+        return (waveform, sample_rate, self.transcription, self.id1, self.id2, self.id3)
 
 
 class CustomLibriSpeechDataset(Dataset):
@@ -59,7 +61,7 @@ def pad_collate(batch):
     xx, sample_rate, yy, id1, id2, id3 = zip(*batch)
     xx = [x.flatten() for x in xx]
     xx_pad = pad_sequence(xx, batch_first=True, padding_value=0)
-    return {"waveform": xx_pad, "transcription": list(yy), "id1": id1[0], "id2": id2[0], "id3": id3[0]}
+    return {"waveform": xx_pad, "transcription": list(yy), "id1": id1, "id2": id2, "id3": id3}
 
 
 def initialize_loader(dataset):
@@ -72,3 +74,28 @@ def initialize_loader(dataset):
     )
 
     return dataloader
+
+
+def split_dataset(dataset, percentage: float):
+    assert percentage > 0 and percentage < 1, "Unvalid percentage provided"
+    total_count = len(dataset)
+    train_count = int(percentage * total_count)
+    split_index = get_split_index(dataset, train_count)
+
+    train_set = torch.utils.data.Subset(dataset, list(range(split_index)))
+    val_set = torch.utils.data.Subset(
+        dataset, list(range(split_index, len(dataset))))
+    # train_dataset, valid_dataset = torch.utils.data.random_split(dataset, (train_count, valid_count))
+
+    return train_set, val_set
+
+
+def get_split_index(dataset, start_index):
+    split_index = start_index
+    speaker_at_split = dataset[start_index][3]
+    speaker = speaker_at_split
+
+    while speaker == speaker_at_split:
+        speaker = dataset[split_index][3]
+        split_index += 1
+    return split_index
