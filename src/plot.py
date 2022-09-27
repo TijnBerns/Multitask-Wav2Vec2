@@ -29,7 +29,13 @@ def line_plot(x1: list, x2: list, save_path: Path, title: str = None, xlabel: st
     plt.savefig(save_path)
 
 
+@click.command()
+@click.option("--jobid", default="000000", type=str, help="jobid for which plots are generated")
 def main(jobid: str, project_dir: str = '.'):
+    root = Path(project_dir) / "logs" / "plots" / jobid
+    if not root.exists():
+        root.mkdir()
+
     # Load the measures
     train_measures = Path(project_dir) / "logs" / \
         "measures" / (jobid + ".train.json")
@@ -40,12 +46,22 @@ def main(jobid: str, project_dir: str = '.'):
 
     # Create the plots of every column
     for column in train_df.columns:
-        save_path = Path(project_dir) / "logs" / \
-            "plots" / f"{jobid}_{column}.png"
+        save_path = root / f"{jobid}_{column}.png"
         line_plot(train_df[column], val_df[column], save_path=save_path,
-                  title=f"Train {column}", xlabel="epoch", ylabel=f"{column}")
+                  title=f"{column}", xlabel="epoch", ylabel=f"{column}")
+
+    num_columns = len(train_df.columns)
+    for i, column in enumerate(train_df.columns[:num_columns // 2]):
+        column_no_sep = train_df.columns[num_columns // 2 + i]
+
+        save_path = root / f"{jobid}_diff_{column}.png"
+
+        x1 = train_df[column] - train_df[column_no_sep]
+        x2 = val_df[column] - val_df[column_no_sep]
+        line_plot(x1, x2, save_path=save_path,
+                  title=f"Difference in {column}", xlabel="epoch", ylabel=f"Diff. {column}")
 
 
 if __name__ == "__main__":
-    main("2385008")
+    main()
     # df = read_logs(Path("/home/tberns/Speaker_Change_Recognition/logs/measures/2385008.train.json"))
