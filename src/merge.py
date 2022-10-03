@@ -9,119 +9,6 @@ from config import Config
 import data
 
 
-def get_speaker_dict(dataset: torchaudio.datasets.LIBRISPEECH):
-    speaker_dict = {}
-
-    for i, sample in tqdm(enumerate(dataset), desc="Generating sample dictionary"):
-        if speaker_dict.get(str(sample[3]), -1) == -1:
-            speaker_dict[str(sample[3])] = [i]
-        else:
-            speaker_dict[str(sample[3])].append(i)
-
-    return speaker_dict
-
-
-def remove_from_dict(speaker_dict: dict, speaker_id: str, sample_idx: int):
-    speaker_dict[speaker_id].remove(sample_idx)
-
-    if len(speaker_dict[speaker_id]) == 0:
-        speaker_dict.pop(speaker_id)
-
-    return speaker_dict
-
-
-def gen_pair_no_repeat(dataset: torchaudio.datasets.LIBRISPEECH, speaker_dict: list, max_tokens: int, max_attempts: int):
-    current_attempt = 0
-    added_tokens = 0
-    prev_speaker = -1
-    pair = []
-
-    while added_tokens < max_tokens and current_attempt < max_attempts and len(speaker_dict) > 0:
-        # Randomly select a speaker
-        speaker_id = random.choice(list(speaker_dict.keys()))
-
-        # Check if speaker is same as previously added speaker
-        if speaker_id == prev_speaker:
-            current_attempt += 1
-            continue
-
-        # Add random sample for selected speaker
-        sample_idx = random.choice(speaker_dict[speaker_id])
-        sample = dataset[sample_idx]
-        pair.append(sample)
-
-        # Update the dict and the total number of tokens in the pair
-        added_tokens += sample[0].size(dim=1)
-        speaker_dict = remove_from_dict(speaker_dict, speaker_id, sample_idx)
-
-    return pair
-
-
-def gen_pairs(dataset, num_samples: int, max_tokens: int, max_attempts: int):
-
-    speaker_dict = get_speaker_dict(dataset)
-
-    sample_pairs = []
-    n = 0
-    attempt = 0
-
-    while n < num_samples and attempt < max_attempts and len(speaker_dict) >= 0:
-        # Generate a pair of samples
-        pair = gen_pair_no_repeat(
-            dataset, speaker_dict, max_tokens, max_attempts)
-
-        # Check if a pair has succesfully been generated
-        if len(pair) == 0:
-            attempt += 1
-            continue
-
-        # Append the generated pair
-        sample_pairs.append(pair)
-
-        # Update counts
-        n += 1
-        attempt = 0
-
-    return sample_pairs
-
-
-def merge_pairs(sample_pairs: list):
-    """Merges pairs of samples in a list
-    """
-    merged_pairs = []
-    for pair in sample_pairs:
-        pair = list(zip(*pair))
-
-        # Check if all sample rates are 16_000
-        assert (all(sample_rate == 16_000 for sample_rate in pair[1]))
-
-        # Construct the sample
-        waveform = torch.cat(pair[0], dim=1)
-        transcription = merge_transcription(pair[3], pair[2])
-        id1 = "&".join(map(str, pair[3]))
-        id2 = "&".join(map(str, pair[4]))
-        id3 = "&".join([str(id).zfill(4) for id in pair[5]])
-        merged_pairs.append([waveform, 16_000, transcription, id1, id2, id3])
-
-    return merged_pairs
-
-
-def merge_transcription(ids, transcriptions):
-    assert(len(ids) == len(transcriptions))
-
-    transcription = ""
-    for i in range(len(ids) - 1):
-        # Diffferent IDs so SC symbol is added
-        if ids[i] != ids[i+1]:
-            transcription += transcriptions[i] + \
-                f" {Config.speaker_change_symbol} "
-        # Same IDs so no SC symbol is added
-        else:
-            transcription += transcriptions[i] + ' '
-
-    return transcription + transcriptions[-1]
-
-
 def save_pairs(save_loc: Path, merged_pairs: list):
     """Saves pairs of samples in the same format as the original LibriSpeech dataset
     """
@@ -148,6 +35,143 @@ def write_trans_file(root: Path, id1: str, id2: str, id3: str, transcription: st
     with trans_file.open('a', encoding='utf-8') as f:
         f.write(f'{id1}-{id2}-{id3} {transcription}\n')
 
+    return
+
+
+class PairGenerator():
+    def gen_pairs(self, dataset, num_samples: int, max_tokens: int, max_attempts: int):
+        speaker_dict = self._get_speaker_dict(dataset)
+        sample_pairs = []
+        n = 0
+        attempt = 0
+
+        while n < num_samples and attempt < max_attempts and len(speaker_dict) >= 0:
+            # Generate a pair of samples
+            pair = self._gen_pair(dataset, speaker_dict, max_tokens)
+
+            # Check if a pair has succesfully been generated
+            if len(pair) == 0:
+                attempt += 1
+                continue
+
+            # Append the generated pair
+            sample_pairs.append(pair)
+
+            # Update counts
+            n += 1
+            attempt = 0
+
+        merged_pairs = self._merge_pairs(sample_pairs)
+        return merged_pairs
+
+    def _gen_pair(self, dataset: torchaudio.datasets.LIBRISPEECH, speaker_dict: list, max_tokens: int):
+        added_tokens = 0
+        pair = []
+        sample = []
+
+        while added_tokens < max_tokens and len(speaker_dict) > 0:
+            # Select next sample for given speaker
+            sample, sample_idx = self._select_sample(
+                dataset, speaker_dict, sample)
+
+            if sample_idx == -1:
+                return pair
+
+            # Add sample to the pair and update the number of added tokens
+            pair.append(sample)
+            speaker_id = str(sample[3])
+            speaker_dict = self._remove_from_dict(
+                speaker_dict, speaker_id, sample_idx)
+            added_tokens += sample[0].size(dim=1)
+
+        return pair
+
+    def _merge_pairs(self, sample_pairs: list):
+        """Merges pairs of samples in a list
+        """
+        merged_pairs = []
+        for pair in sample_pairs:
+            pair = list(zip(*pair))
+
+            # Check if all sample rates are 16_000
+            assert (all(sample_rate == 16_000 for sample_rate in pair[1]))
+
+            # Construct the sample
+            waveform = torch.cat(pair[0], dim=1)
+            transcription = self._merge_transcription(pair[3], pair[2])
+            id1 = "&".join(map(str, pair[3]))
+            id2 = "&".join(map(str, pair[4]))
+            id3 = "&".join([str(id).zfill(4) for id in pair[5]])
+            merged_pairs.append(
+                [waveform, 16_000, transcription, id1, id2, id3])
+
+        return merged_pairs
+
+    def _merge_transcription(self, ids, transcriptions):
+        assert(len(ids) == len(transcriptions))
+
+        transcription = ""
+        for i in range(len(ids) - 1):
+            # Diffferent IDs so SC symbol is added
+            if ids[i] != ids[i+1]:
+                transcription += transcriptions[i] + \
+                    f" {Config.speaker_change_symbol} "
+            # Same IDs so no SC symbol is added
+            else:
+                transcription += transcriptions[i] + ' '
+
+        return transcription + transcriptions[-1]
+
+    def _get_speaker_dict(self, dataset: torchaudio.datasets.LIBRISPEECH):
+        speaker_dict = {}
+
+        for i, sample in tqdm(enumerate(dataset), desc="Generating sample dictionary"):
+            if speaker_dict.get(str(sample[3]), -1) == -1:
+                speaker_dict[str(sample[3])] = [i]
+            else:
+                speaker_dict[str(sample[3])].append(i)
+
+        return speaker_dict
+
+    def _remove_from_dict(self, speaker_dict: dict, speaker_id: str, sample_idx: int):
+        speaker_dict[speaker_id].remove(sample_idx)
+
+        if len(speaker_dict[speaker_id]) == 0:
+            speaker_dict.pop(speaker_id)
+
+        return speaker_dict
+
+
+class PairGeneratorNoRepeat(PairGenerator):
+    def _select_sample(self, dataset, speaker_dict, prev_sample: list = []):
+        speaker_ids = list(speaker_dict.keys())
+
+        if len(prev_sample) != 0:
+            if len(speaker_ids) == 1 and speaker_ids[0] == str(prev_sample[3]):
+                return [], -1
+            try:
+                speaker_ids.remove(str(prev_sample[3]))
+            except ValueError:
+                pass
+
+        speaker_id = random.choice(speaker_ids)
+        sample_idx = random.choice(speaker_dict[speaker_id])
+        sample = dataset[sample_idx]
+        return sample, sample_idx
+
+
+class PairGeneratorRepeat(PairGenerator):
+    def _select_sample(self, dataset, speaker_dict: dict, prev_sample: list = []):
+        speaker_id = list(speaker_dict.keys())[0]
+        sample_idx = speaker_dict[speaker_id][0]
+        sample = dataset[sample_idx]
+
+        # Check if selected sample is from the same book as the previous sample
+        if len(prev_sample) != 0 and sample[4] != prev_sample[4]:
+            return [], -1
+
+        return sample, sample_idx
+
 
 def main():
     root = Path(Config.datapath)
@@ -160,87 +184,22 @@ def main():
     dev_set = torchaudio.datasets.LIBRISPEECH(
         root, url="dev-clean", download=True)
 
-    for dataset, save_loc, num_samples in [(dev_set, "dev-clean-no-rep", 1000),
-                                           (test_set, "test-clean-no-rep", 1000),
-                                           (val_set, "val-clean-no-rep", 1000),
-                                           (train_set, "train-clean-no-rep", 5000)]:
+    for dataset, dataset_str, num_samples in [(dev_set, "dev-clean", 1000),
+                                              (test_set, "test-clean", 1000),
+                                              (val_set, "val-clean", 1000),
+                                              (train_set, "train-clean", 5000)]:
 
-        print(f"Merging samples of {dataset}...")
-        pairs = gen_pairs(dataset=dataset, max_tokens=Config.max_tokens,
-                          max_attempts=Config.max_attempts, num_samples=num_samples)
-        merged_pairs = merge_pairs(pairs)
-        save_pairs(root / save_loc, merged_pairs)
+        print(f"Merging samples of {dataset_str}...")
+        pair_generator_repeat = PairGeneratorRepeat()
+        merged_pairs = pair_generator_repeat.gen_pairs(dataset, num_samples=num_samples,
+                                                       max_tokens=Config.max_tokens, max_attempts=Config.max_attempts)
+        save_pairs(root / (dataset_str + "-rep"), merged_pairs)
+
+        pair_generator_no_repeat = PairGeneratorNoRepeat()
+        merged_pairs = pair_generator_no_repeat.gen_pairs(dataset, num_samples=num_samples,
+                                                          max_tokens=Config.max_tokens, max_attempts=Config.max_attempts)
+        save_pairs(root / (dataset_str + "-no-rep"), merged_pairs)
 
 
 if __name__ == "__main__":
     main()
-
-
-# def generate_no_repeat(root: Path, dataset: torchaudio.datasets.LIBRISPEECH, speaker_dict: dict, n_speakers: int):
-#     """Generates a single sample pair in which two adjacent samples are not from the same speaker
-#     """
-#     filter(list(root.iterdir()))
-#     for child in root.iterdir():
-#         if not child.is_dir():
-#             continue
-
-#         speaker_id = child.name()
-
-#     # idxs = random.sample(speaker_dict, k=n_speakers)
-#     # prev_speaker_id = -1
-#     # samples = []
-
-#     # for id in idxs:
-#     #     sample = dataset[id]
-#     #     if prev_speaker_id == sample[3]:
-#     #         return [], []
-
-#     #     prev_speaker_id = sample[3]
-#     #     samples.append(sample)
-
-#     # return samples, idxs
-
-
-# def generate_repeat(dataset: torchaudio.datasets.LIBRISPEECH, speaker_dict: list, n_speakers: int):
-
-#     pass
-
-# def generate_sample_pairs(dataset: torchaudio.datasets.LIBRISPEECH, generate_func, n_pairs: int = 1000,
-#                           n_speakers: int = 2, max_attempts: int = 100, kwargs=None):
-#     """Generates sample pairs following the provided function
-#     """
-#     assert (n_pairs * n_speakers < len(dataset))
-#     sample_pairs = []
-#     n = 0
-#     attempt = 0
-
-#     while n < n_pairs and attempt < max_attempts:
-#         # Try to generate a pair
-#         samples, ids = generate_func(dataset, )
-
-#         # Check if a pair has succesfully been generated
-#         if len(samples) != n_speakers:
-#             attempt += 1
-#             continue
-
-#         # Append the generated pair
-#         sample_pairs.append(samples)
-#         idxs = list(set(idxs) - set(ids))
-
-#         # Increase counter and set current attempt back to 0
-#         n += 1
-#         attempt = 0
-
-#     return sample_pairs
-
-# if __name__ == "__main__":
-#     random.seed(Config.seed)
-#     # # Data downloads
-#     # train_ds = torchaudio.datasets.LIBRISPEECH(Config.datapath, url="train-clean-100", download=True)
-#     # test_ds = torchaudio.datasets.LIBRISPEECH(Config.datapath, url="test-clean", download=True)
-#     dev_ds = torchaudio.datasets.LIBRISPEECH(
-#         Config.datapath, url="dev-clean", download=False)
-
-#     sample_pairs = generate_sample_pairs(dev_ds, generate_no_repeat)
-#     merged_pairs = merge_pairs(sample_pairs)
-#     save_pairs(Config.datapath + "/test", merged_pairs)

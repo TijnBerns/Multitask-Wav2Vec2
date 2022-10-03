@@ -5,6 +5,8 @@ import torchaudio
 from config import Config
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
+import itertools
+from typing import Union, List
 
 
 class LirbriSpeechItem(object):
@@ -21,9 +23,14 @@ class LirbriSpeechItem(object):
 
 
 class CustomLibriSpeechDataset(Dataset):
-    def __init__(self, root_dir) -> None:
+    def __init__(self, root_dir: Union[str, List[str]]) -> None:
         super().__init__()
-        self.root_dir = Path(root_dir)
+
+        if type(root_dir) == str:
+            self.root_dir = [Path(root_dir)]
+        else:
+            self.root_dir = list(map(Path, root_dir))
+
         self.samples = self._load_samples()
 
     def _load_transcription(self, file_name: Path, ids: list):
@@ -42,7 +49,8 @@ class CustomLibriSpeechDataset(Dataset):
         return transcription
 
     def _load_samples(self):
-        file_names = list(self.root_dir.rglob("*.flac"))
+        file_names = [list(dir.rglob("*.flac")) for dir in self.root_dir]
+        file_names = list(itertools.chain(*file_names))
         samples = [0] * len(file_names)
         for i, file_name in enumerate(file_names):
             ids = file_name.name[:-5].split('-')

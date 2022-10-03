@@ -9,3 +9,5 @@ librosa
 plotly
 jiwer
 pydub
+click
+git+https://github.com/davidavdav/WordErrorRate.py.git

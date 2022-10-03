@@ -11,4 +11,4 @@ project_dir=.
 
 # execute train CLI
 source "$project_dir"/venv/bin/activate
-python "$project_dir"/src/eval.py
+python "$project_dir"/src/eval.py --model_path $1

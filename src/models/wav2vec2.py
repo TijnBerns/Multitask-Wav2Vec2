@@ -3,7 +3,7 @@ from config import Config
 import torch
 
 
-def load_processor():
+def load_processor() -> Wav2Vec2Processor:
     # Initialize processor
     tokenizer = Wav2Vec2CTCTokenizer(
         "src/models/vocab.json", unk_token="<unk>", pad_token="<pad>", word_delimiter_token="|")

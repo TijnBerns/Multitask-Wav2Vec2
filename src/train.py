@@ -2,6 +2,7 @@
 import json
 from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 import torch
+from torch.utils.data.dataloader import DataLoader
 from config import Config
 import data
 from tqdm import tqdm
@@ -11,44 +12,57 @@ from collections import Counter
 import utils
 from pathlib import Path
 import models.wav2vec2
+import worderrorrate
 
 
 class Trainer():
-    def __init__(self, device, jobid) -> None:
+    def __init__(self, device: str, jobid: str) -> None:
         self.device = device
         self.jobid = jobid
 
+        self.wup_epochs = 1
+        self.wup_lr = 1e-3
+        self.epochs = 10
+        self.lr = 1e-5
+
+        # Lists of results
         self.train_measures = []
-        self.val_measures = []
         self.test_measures = []
+        self.val_measures = []
+
+        # Directory to which checkpoints are saved
         self.checkpoint_dir = Path(f"./checkpoints/{jobid}")
 
-    def train(self, train_loader, val_loader, model: Wav2Vec2ForCTC, processor: Wav2Vec2Processor, num_epochs: int):
-        # Create directory in which checkpoints are saved
+    def train(self, train_loader: DataLoader,
+              val_loader: DataLoader,
+              model: Wav2Vec2ForCTC,
+              processor: Wav2Vec2Processor):
+
+        # Create checkpoint directory
         self.checkpoint_dir.mkdir(exist_ok=True)
 
+        # Warming-up
+        self.warm_up(train_loader, model, processor)
+
         # Initialize optimizer and scheduler
-        optim = torch.optim.Adam(model.parameters(), lr=1e-4)
+        optim = torch.optim.Adam(model.parameters(), lr=self.lr)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optim, num_epochs)
+            optim, self.epochs)
 
         best_loss = 1e12
-        for e in range(num_epochs):
+        for e in range(self.epochs):
             # Train model for one epoch
             train_measures = self._epoch(train_loader, model, processor, optim)
-            scheduler.step()
             self.train_measures.append(train_measures)
             self._write_results(type="train", measures=self.train_measures)
+            scheduler.step()
 
             # Evaluate model performance
-            model.eval()
-            with torch.no_grad():
-                val_measures = self._epoch(val_loader, model, processor)
-                self.val_measures.append(val_measures)
-                self._write_results(type="val", measures=self.val_measures)
+            self.eval(val_loader, model, processor)
+            self._write_results(type="val", measures=self.val_measures)
 
             # Save model if loss is improved
-            if val_measures["CTCloss"] < best_loss:
+            if self.val_measures[-1]["CTCloss"] < best_loss:
                 torch.save(model.state_dict(),
                            self.checkpoint_dir / f"{self.jobid}.best.pt")
 
@@ -57,60 +71,88 @@ class Trainer():
                 torch.save(model.state_dict(), self.checkpoint_dir /
                            f"{self.jobid}.epoch_{e}.pt")
 
-        return
+        return self.train_measures
 
-    def test(self, test_loader, model, processor, type: str = "test"):
-        measures = self._epoch(test_loader, model, processor)
-        self.test_measures.append(measures)
-        # self._write_results(type=type, measures=measures)
-        return measures
+    def eval(self, dataloader: DataLoader,
+             model: Wav2Vec2ForCTC,
+             processor: Wav2Vec2Processor):
+        model.eval()
+        with torch.no_grad():
+            measures = self._epoch(dataloader, model, processor)
+        model.train()
+        self.val_measures.append(measures)
+        return self.val_measures
 
-    def evaluate(self, dataloader, model, processor, num_samples=20):
-        res = []
-        i = 0
+    def warm_up(self, dataloader: DataLoader,
+                model: Wav2Vec2ForCTC,
+                processor: Wav2Vec2Processor):
 
-        for sample in dataloader:
-            waveform = sample['waveform'].to(self.device)
-            ground_truth = sample['transcription']
+        optim = torch.optim.Adam(model.parameters(), lr=self.wup_lr)
 
-            # Retrieve target labels
-            with processor.as_target_processor():
-                labels = processor(ground_truth, padding=True,
-                                   return_tensors='pt').input_ids
-                labels = labels.to(self.device)
+        # Freeze all layers except last
+        model.requires_grad_(False)
+        model.lm_head.requires_grad_(True)
 
-             # Retrieve input values
-            input_values = processor(
-                waveform, sampling_rate=16_000, return_tensors="pt", padding="longest").input_values
-            input_values = torch.reshape(
-                input_values, (len(waveform), -1)).to(self.device)
+        # Train model
+        for _ in range(self.wup_epochs):
+            measures = self._epoch(dataloader, model, processor, optim)
+            self.train_measures.append(measures)
+            self._write_results(type="train", measures=self.train_measures)
 
-            output = model(input_values, labels=labels)
+        # Unfreeze all layers and return
+        model.requires_grad_(True)
+        return self.train_measures
 
-            logits = output.logits
-            predicted_ids = torch.argmax(logits, dim=-1)
-            hypothesis = processor.batch_decode(predicted_ids)
-            res.append({"ground_truth": ground_truth,
-                       "hypothesis": hypothesis})
+    # def evaluate(self, dataloader, model, processor, num_samples=20):
+    #     res = []
+    #     i = 0
 
-            i += 1
-            if i == num_samples:
-                break
+    #     for sample in dataloader:
+    #         waveform = sample['waveform'].to(self.device)
+    #         ground_truth = sample['transcription']
 
-        return res
+    #         # Retrieve target labels
+    #         with processor.as_target_processor():
+    #             labels = processor(ground_truth, padding=True,
+    #                                return_tensors='pt').input_ids
+    #             labels = labels.to(self.device)
 
-    def _epoch(self, dataloader, model, processor, optim=None):
+    #          # Retrieve input values
+    #         input_values = processor(
+    #             waveform, sampling_rate=16_000, return_tensors="pt", padding="longest").input_values
+    #         input_values = torch.reshape(
+    #             input_values, (len(waveform), -1)).to(self.device)
+
+    #         output = model(input_values, labels=labels)
+
+    #         logits = output.logits
+    #         predicted_ids = torch.argmax(logits, dim=-1)
+    #         hypothesis = processor.batch_decode(predicted_ids)
+    #         res.append({"ground_truth": ground_truth,
+    #                    "hypothesis": hypothesis})
+
+    #         i += 1
+    #         if i == num_samples:
+    #             break
+
+    #     return res
+
+    def _epoch(self, dataloader: DataLoader,
+               model: Wav2Vec2ForCTC,
+               processor: Wav2Vec2Processor,
+               optim=None):
+
         total_loss = 0
         num_batches = 0
         measures = Counter({})
-        measures_no_sep = Counter({})
+        # measures_no_sep = Counter({})
 
         pbar = tqdm(dataloader, desc=f"loss: ")
         for sample in pbar:
             waveform = sample['waveform'].to(self.device)
-            ground_truth = sample['transcription']
-            ground_truth_no_sep = utils.remove_speaker_change_symbol(
-                ground_truth)
+            reference = sample['transcription']
+            # reference_no_sep = utils.remove_speaker_change_symbol(
+            #     reference)
 
             # Retrieve input values
             input_values = processor(
@@ -120,7 +162,7 @@ class Trainer():
 
             # Retrieve target labels
             with processor.as_target_processor():
-                labels = processor(ground_truth, padding=True,
+                labels = processor(reference, padding=True,
                                    return_tensors='pt').input_ids
                 labels = labels.to(self.device)
 
@@ -144,24 +186,25 @@ class Trainer():
             logits = output.logits
             predicted_ids = torch.argmax(logits, dim=-1)
             hypothesis = processor.batch_decode(predicted_ids)
-            hypothesis_no_sep = utils.remove_speaker_change_symbol(hypothesis)
+            # hypothesis_no_sep = utils.remove_speaker_change_symbol(hypothesis)
 
             # Add measures
-            measures = Counter(jiwer.compute_measures(
-                ground_truth, hypothesis)) + measures
-            measures_no_sep = Counter(jiwer.compute_measures(
-                ground_truth_no_sep, hypothesis_no_sep)) + measures_no_sep
-
+            # measures = Counter(jiwer.compute_measures(
+            #     ground_truth, hypothesis)) + measures
+            # measures_no_sep = Counter(jiwer.compute_measures(
+            #     ground_truth_no_sep, hypothesis_no_sep)) + measures_no_sep
+            measures = Counter(utils.spch_measure(
+                reference[0], hypothesis[0])) + measures
             num_batches += 1
 
         # Construct measures dict and return
-        measures_no_sep = {f"no_sep_{k}": v for (
-            k, v) in measures_no_sep.items()}
-        measures_no_sep = utils.mean_measures(
-            measures_no_sep, num_batches=num_batches, len_dataset=len(dataloader.dataset))
+        # measures_no_sep = {f"no_sep_{k}": v for (
+        #     k, v) in measures_no_sep.items()}
+        # measures_no_sep = utils.mean_measures(
+        #     measures_no_sep, num_batches=num_batches, len_dataset=len(dataloader.dataset))
         measures = utils.mean_measures(
             measures, num_batches, len_dataset=len(dataloader.dataset))
-        measures.update(measures_no_sep)
+        # measures.update(measures_no_sep)
         measures['CTCloss'] = total_loss / len(dataloader.dataset)
 
         return measures
@@ -181,19 +224,28 @@ class Trainer():
 
 
 def main(device: str, jobid: str):
+    ref = "# this is sentence and this is a longer sentence"
+    hyp = "# nice"
+    wer = worderrorrate.WER(ref, hyp)
+    breakpoint()
+
     # Load model and processor
     processor = models.wav2vec2.load_processor()
     model = models.wav2vec2.load_model().to(device)
 
     # Load datasets
-    train_set = data.CustomLibriSpeechDataset(
-        Config.datapath + '/train-clean-no-rep')
-    val_set = data.CustomLibriSpeechDataset(
-        Config.datapath + '/val-clean-no-rep')
-    test_set = data.CustomLibriSpeechDataset(
-        Config.datapath + '/test-clean-no-rep')
-    dev_set = data.CustomLibriSpeechDataset(
-        Config.datapath + '/dev-clean-no-rep')
+    train_set = data.CustomLibriSpeechDataset([
+        Config.datapath + '/train-clean-no-rep',
+        Config.datapath + '/train-clean-rep'])
+    val_set = data.CustomLibriSpeechDataset([
+        Config.datapath + '/val-clean-no-rep',
+        Config.datapath + '/val-clean-rep'])
+    test_set = data.CustomLibriSpeechDataset([
+        Config.datapath + '/test-clean-no-rep',
+        Config.datapath + '/test-clean-rep'])
+    dev_set = data.CustomLibriSpeechDataset([
+        Config.datapath + '/dev-clean-no-rep',
+        Config.datapath + '/dev-clean-rep'])
 
     # Initialize dataloaders
     train_loader = data.initialize_loader(train_set)
@@ -204,8 +256,8 @@ def main(device: str, jobid: str):
     # Perform training
     trainer = Trainer(device=device, jobid=jobid)
     trainer.train(train_loader=train_loader, val_loader=val_loader,
-                  model=model, processor=processor, num_epochs=60)
-    trainer.test(test_loader, model, processor)
+                  model=model, processor=processor)
+    trainer.eval(dev_loader, model, processor)
 
 
 if __name__ == "__main__":
