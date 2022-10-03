@@ -31,7 +31,8 @@ def line_plot(x1: list, x2: list, save_path: Path, title: str = None, xlabel: st
 
 @click.command()
 @click.option("--jobid", default="000000", type=str, help="jobid for which plots are generated")
-def main(jobid: str, project_dir: str = '.'):
+def main(jobid: str):
+    project_dir = '.'
     root = Path(project_dir) / "logs" / "plots" / jobid
     if not root.exists():
         root.mkdir()

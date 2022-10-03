@@ -10,7 +10,11 @@ class Config():
     seed: int = 2022
     
     # Training parameters
-    lr: float = 1e-4
+    lr: float = 1e-3
+    num_epochs = 20
+    num_epochs_stage_one = 1
+    num_epochs_stage_two = num_epochs - num_epochs_stage_one
+    assert num_epochs_stage_two > 0 
          
     # parameters for dataset and dataloaders
     batch_size: int = 1

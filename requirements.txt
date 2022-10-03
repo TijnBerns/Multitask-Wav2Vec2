@@ -10,4 +10,7 @@ plotly
 jiwer
 pydub
 click
+pytorch_lightning
+torchmetrics
+
 git+https://github.com/davidavdav/WordErrorRate.py.git

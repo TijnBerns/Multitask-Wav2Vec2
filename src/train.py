@@ -1,5 +1,6 @@
 
 import json
+from pytorch_lightning.accelerators import accelerator
 from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 import torch
 from torch.utils.data.dataloader import DataLoader
@@ -13,12 +14,14 @@ import utils
 from pathlib import Path
 import models.wav2vec2
 import worderrorrate
+import pytorch_lightning as pl
 
 
 class Trainer():
     def __init__(self, device: str, jobid: str) -> None:
         self.device = device
         self.jobid = jobid
+        self.measure_steps = 500
 
         self.wup_epochs = 1
         self.wup_lr = 1e-3
@@ -103,39 +106,6 @@ class Trainer():
         model.requires_grad_(True)
         return self.train_measures
 
-    # def evaluate(self, dataloader, model, processor, num_samples=20):
-    #     res = []
-    #     i = 0
-
-    #     for sample in dataloader:
-    #         waveform = sample['waveform'].to(self.device)
-    #         ground_truth = sample['transcription']
-
-    #         # Retrieve target labels
-    #         with processor.as_target_processor():
-    #             labels = processor(ground_truth, padding=True,
-    #                                return_tensors='pt').input_ids
-    #             labels = labels.to(self.device)
-
-    #          # Retrieve input values
-    #         input_values = processor(
-    #             waveform, sampling_rate=16_000, return_tensors="pt", padding="longest").input_values
-    #         input_values = torch.reshape(
-    #             input_values, (len(waveform), -1)).to(self.device)
-
-    #         output = model(input_values, labels=labels)
-
-    #         logits = output.logits
-    #         predicted_ids = torch.argmax(logits, dim=-1)
-    #         hypothesis = processor.batch_decode(predicted_ids)
-    #         res.append({"ground_truth": ground_truth,
-    #                    "hypothesis": hypothesis})
-
-    #         i += 1
-    #         if i == num_samples:
-    #             break
-
-    #     return res
 
     def _epoch(self, dataloader: DataLoader,
                model: Wav2Vec2ForCTC,
@@ -224,14 +194,9 @@ class Trainer():
 
 
 def main(device: str, jobid: str):
-    ref = "# this is sentence and this is a longer sentence"
-    hyp = "# nice"
-    wer = worderrorrate.WER(ref, hyp)
-    breakpoint()
-
-    # Load model and processor
-    processor = models.wav2vec2.load_processor()
-    model = models.wav2vec2.load_model().to(device)
+    # # Load model and processor
+    # processor = models.wav2vec2.load_processor()
+    # model = models.wav2vec2.load_model().to(device)
 
     # Load datasets
     train_set = data.CustomLibriSpeechDataset([
@@ -253,32 +218,27 @@ def main(device: str, jobid: str):
     val_loader = data.initialize_loader(val_set)
     dev_loader = data.initialize_loader(dev_set)
 
-    # Perform training
-    trainer = Trainer(device=device, jobid=jobid)
-    trainer.train(train_loader=train_loader, val_loader=val_loader,
-                  model=model, processor=processor)
-    trainer.eval(dev_loader, model, processor)
+    # # Perform training
+    # trainer = Trainer(device=device, jobid=jobid)
+    # trainer.train(train_loader=train_loader, val_loader=val_loader,
+    #               model=model, processor=processor)
+    
+    
+    
+    # Load wav2vec2 module
+    model = models.wav2vec2.Wav2Vec2Module(num_epochs=Config.num_epochs, lr=Config.lr)
+    
+    # First stage
+    model.freeze_all_but_head()
+    first_stage = pl.Trainer(max_epochs=Config.num_epochs_stage_one, accelerator=device)
+    first_stage.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
+    
+    # Second stage
+    model.unfreeze() 
+    second_stage = pl.Trainer(max_epochs=Config.num_epochs_stage_two, accelerator=device)
+    second_stage.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
 
 
 if __name__ == "__main__":
     device, jobid = utils.set_device()
     main(device, jobid)
-
-
-"""
-for sample in dev_clean_loader:
-
-    input_values = processor(sample['waveform'], sampling_rate=16_000, return_tensors="pt", padding="longest").input_values  
-    
-    # retrieve logits
-    input_values = torch.reshape(input_values, (1,-1))
-    logits = model(input_values).logits
-    
-
-    # take argmax and decode
-    predicted_ids = torch.argmax(logits, dim=-1)
-    transcription = processor.batch_decode(predicted_ids)
-    
-    breakpoint()
-        
-"""
