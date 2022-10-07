@@ -10,8 +10,9 @@ class Config():
     seed: int = 2022
     
     # Training parameters
-    lr: float = 1e-3
-    num_epochs = 20
+    lr_stage_one: float = 1e-3
+    lr_stage_two: float = 1e-5
+    num_epochs = 10
     num_epochs_stage_one = 1
     num_epochs_stage_two = num_epochs - num_epochs_stage_one
     assert num_epochs_stage_two > 0 
@@ -27,7 +28,8 @@ class Config():
     # Parameters for merging samples
     speaker_change_symbol: str = '#'
     num_samples: int = 1000
-    max_tokens: int = sample_rate * 15
+    min_tokens: int = int(sample_rate * 17.5)
+    max_tokens: int = int(sample_rate * 30)
     max_attempts: int = 100
     
     

@@ -72,15 +72,14 @@ def pad_collate(batch):
     return {"waveform": xx_pad, "transcription": list(yy), "id1": id1, "id2": id2, "id3": id3}
 
 
-def initialize_loader(dataset):
+def initialize_loader(dataset, shuffle: bool):
     dataloader = torch.utils.data.DataLoader(
         dataset,
         batch_size=Config.batch_size,
-        shuffle=True,
+        shuffle=shuffle,
         num_workers=Config.num_workers,
         collate_fn=pad_collate,
     )
-
     return dataloader
 
 
