@@ -1,8 +1,6 @@
-import utils
 from config import Config
 from typing import List, Any, Dict
 from metrics import SpeakerChangeStats
-from pathlib import Path
 
 from transformers import Wav2Vec2ForCTC, Wav2Vec2CTCTokenizer, Wav2Vec2FeatureExtractor, Wav2Vec2Processor
 import torch
@@ -29,7 +27,7 @@ def load_model() -> Wav2Vec2ForCTC:
 
 
 class Wav2Vec2Module(pl.LightningModule):
-    def __init__(self, 
+    def __init__(self,
                  num_epochs: int = Config.num_epochs,
                  stage: int = 1,
                  lr_stage_one: float = Config.lr_stage_one,
@@ -41,10 +39,10 @@ class Wav2Vec2Module(pl.LightningModule):
         self.processor: Wav2Vec2Processor = load_processor()
         self.model: Wav2Vec2ForCTC = load_model()
         self.stage: int = stage
-        
+
         # Metrics
         self.val_stats: SpeakerChangeStats = SpeakerChangeStats(prefix="val")
-        self.test_stats: SpeakerChangeStats = SpeakerChangeStats(prefix="test")
+        self.test_stats: SpeakerChangeStats = SpeakerChangeStats(prefix="dev")
         self.test_preds: List[Dict] = []
 
         # Training parameters
@@ -126,10 +124,10 @@ class Wav2Vec2Module(pl.LightningModule):
     def configure_optimizers(self) -> None:
         # setup the optimization algorithm
         if self.stage == 1:
-            optimizer = torch.optim.Adam(
+            optimizer = torch.optim.SGD(
                 self.parameters(), lr=self.lr_stage_one)
         elif self.stage == 2:
-            optimizer = torch.optim.Adam(
+            optimizer = torch.optim.SGD(
                 self.parameters(), lr=self.lr_stage_two)
 
         # setup the learning rate schedule.

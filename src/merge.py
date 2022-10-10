@@ -1,6 +1,5 @@
 
 from pathlib import Path
-from pprint import pprint
 import torchaudio
 import torch
 import random
@@ -9,12 +8,12 @@ from config import Config
 import data
 from typing import List
 
-waveform_idx = 0
-sample_rate_idx = 1
-transcription_idx = 2
-speaker_id_idx = 3
+wav_idx = 0
+srate_idx = 1
+trans = 2
+speaker_idx = 3
 book_idx = 4
-samplenr_idx = 5
+snr_idx = 5
 
 
 def save_pairs(save_loc: Path, merged_pairs: List):
@@ -94,10 +93,10 @@ class PairGenerator():
 
             # Add sample to the pair and update the number of added tokens
             pair.append(sample)
-            speaker_id = str(sample[3])
+            speaker_id = str(sample[speaker_idx])
             speaker_dict = self._remove_from_dict(
                 speaker_dict, speaker_id, sample_idx)
-            added_tokens += sample[0].size(dim=1)
+            added_tokens += sample[wav_idx].size(dim=1)
 
         return pair
 
@@ -142,10 +141,10 @@ class PairGenerator():
         speaker_dict = {}
 
         for i, sample in tqdm(enumerate(dataset), desc="Generating sample dictionary"):
-            if speaker_dict.get(str(sample[3]), -1) == -1:
-                speaker_dict[str(sample[3])] = [i]
+            if speaker_dict.get(str(sample[speaker_idx]), -1) == -1:
+                speaker_dict[str(sample[speaker_idx])] = [i]
             else:
-                speaker_dict[str(sample[3])].append(i)
+                speaker_dict[str(sample[speaker_idx])].append(i)
 
         return speaker_dict
 
@@ -166,10 +165,10 @@ class PairGeneratorNoRepeat(PairGenerator):
         speaker_ids = list(speaker_dict.keys())
 
         if len(prev_sample) != 0:
-            if len(speaker_ids) == 1 and speaker_ids[0] == str(prev_sample[3]):
+            if len(speaker_ids) == 1 and speaker_ids[0] == str(prev_sample[speaker_idx]):
                 return [], -1
             try:
-                speaker_ids.remove(str(prev_sample[3]))
+                speaker_ids.remove(str(prev_sample[speaker_idx]))
             except ValueError:
                 pass
 
@@ -186,7 +185,7 @@ class PairGeneratorRepeat(PairGenerator):
         sample = dataset[sample_idx]
 
         # Check if selected sample is from the same book as the previous sample
-        if len(prev_sample) != 0 and sample[4] != prev_sample[4]:
+        if len(prev_sample) != 0 and sample[book_idx] != prev_sample[book_idx]:
             return [], -1
 
         return sample, sample_idx
@@ -203,10 +202,12 @@ def main():
     dev_set = torchaudio.datasets.LIBRISPEECH(
         root, url="dev-clean", download=True)
 
-    for dataset, dataset_str, num_samples in [(dev_set, "dev-clean", 10e6),
-                                              (test_set, "test-clean", 10e6),
-                                              (val_set, "val-clean", 10e6),
-                                              (train_set, "train-clean", 10e6)]:
+    for dataset, dataset_str, num_samples in [
+        (dev_set, "dev-clean", 10e6),
+        (test_set, "test-clean", 10e6),
+        (val_set, "val-clean", 10e6),
+        (train_set, "train-clean", 10e6)
+    ]:
 
         print(f"Merging samples of {dataset_str}...")
         pair_generator_repeat = PairGeneratorRepeat(num_samples=num_samples,

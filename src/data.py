@@ -23,7 +23,7 @@ class LirbriSpeechItem(object):
 
 
 class CustomLibriSpeechDataset(Dataset):
-    def __init__(self, root_dir: Union[str, List[str]]) -> None:
+    def __init__(self, root_dir: Union[str, List[str]], speaker_change: bool = True) -> None:
         super().__init__()
 
         if type(root_dir) == str:
@@ -31,7 +31,9 @@ class CustomLibriSpeechDataset(Dataset):
         else:
             self.root_dir = list(map(Path, root_dir))
 
+        self.speaker_change = speaker_change
         self.samples = self._load_samples()
+        
 
     def _load_transcription(self, file_name: Path, ids: list):
         trans_file = file_name.parent / ("-".join(ids[:-1]) + '.trans.txt')
@@ -43,10 +45,17 @@ class CustomLibriSpeechDataset(Dataset):
             for line in lines:
                 id, trans = line.split(sep=' ', maxsplit=1)
 
-                if id == speaker_book_id:
-                    transcription = trans[:-1]
+                if id != speaker_book_id:
+                    continue
 
-        return transcription
+                transcription = trans[:-1]  # Removes the newline character
+                if not self.speaker_change:
+                    transcription = transcription.replace(f"{Config.speaker_change_symbol}", "")
+                
+                return transcription
+                    
+        raise ValueError(f"Could not find transcription of {speaker_book_id} in {trans_file}.")
+
 
     def _load_samples(self):
         file_names = [list(dir.rglob("*.flac")) for dir in self.root_dir]
@@ -87,7 +96,7 @@ def split_dataset(dataset, percentage: float):
     assert percentage > 0 and percentage < 1, "Unvalid percentage provided"
     total_count = len(dataset)
     train_count = int(percentage * total_count)
-    split_index = get_split_index(dataset, train_count)
+    split_index = _get_split_index(dataset, train_count)
 
     train_set = torch.utils.data.Subset(dataset, list(range(split_index)))
     val_set = torch.utils.data.Subset(
@@ -97,7 +106,7 @@ def split_dataset(dataset, percentage: float):
     return train_set, val_set
 
 
-def get_split_index(dataset, start_index):
+def _get_split_index(dataset, start_index):
     split_index = start_index
     speaker_at_split = dataset[start_index][3]
     speaker = speaker_at_split

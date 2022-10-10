@@ -6,15 +6,22 @@ import torch
 from worderrorrate import WER
 import numpy as np
 import math
-from typing import List, Dict, Tuple
+from typing import List, Dict, Any, Tuple, Union
 import json
 import pandas as pd
+from pathlib import Path
+
+
+def json_dump(path: Union[str, Path], data: Any) -> None:
+    with open(path, 'w') as f:
+        json.dump(data, f, indent=2)
 
 
 def write_dict_list(path: str, data: List[Dict]) -> None:
     df = pd.DataFrame(data)
     df.to_csv(path)
     return
+
 
 def remove_speaker_change_symbol(transcriptions: List[str]) -> List[str]:
     transcriptions = map(lambda x: x.replace(

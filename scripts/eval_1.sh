@@ -12,4 +12,4 @@ project_dir=.
 
 # execute train CLI
 source "$project_dir"/venv/bin/activate
-python "$project_dir"/src/eval.py --dataset_str=dev-clean
+python "$project_dir"/src/eval.py --checkpoint_path=$1 
