@@ -1,3 +1,4 @@
+
 from torchmetrics import SumMetric
 import torch
 from typing import Optional, Any, List, Tuple, Union, Dict
@@ -7,42 +8,46 @@ from config import Config
 from jiwer import wer as jiwer_wer
 
 
-def _fnr(fn: int, spch: int) -> float:
-    """Computes the average false negative rate only considering speaker changes
+def _fnr(fn: SumMetric, spch: SumMetric) -> torch.tensor:   
+    """Computes false negative rate only considering speaker changes
 
     Returns:
-        float: average false negative rate
+        tensor: false negative rate
     """
-    return fn / max(1., spch)
+    if spch.value == 0:
+        return torch.tensor(-1)
+    return (fn / spch).compute()
 
 
-def _fpr(fp, words, spch) -> float:
-    """Compute the average false positive rate only considering speaker changes
+def _fpr(fp: SumMetric, words: SumMetric) -> torch.tensor:
+    """Compute false positive rate only considering speaker changes
 
     Returns:
-        float: average false positive rate
+        tensor: false positive rate
     """
-    return fp / max(1., (words - spch))
-
-
-def _spch_er(s: int, i: int, d: int, spch: int) -> float:
-    """Computes the speaker change error
-
-    Returns:
-        float: average speaker change error
-    """
-    return (s + i + d) / max(1, spch)
+    if words.value == 0:
+        return torch.tensor(-1)
+    return (fp / words).compute()
 
 
 class SpeakerChangeStats():
     def __init__(self, prefix: str = None) -> None:
-        self.fnr = SumMetric()
-        self.fpr = SumMetric()
-        self.wer = SumMetric()
-        self.spch_er = SumMetric()
-        self.samples = SumMetric()
+        self.i = SumMetric()  # number of speaker change insertions
+        self.d = SumMetric()  # number of speaker change deletions
+        self.s = SumMetric()  # number of speaker change substitutions
+        self.c = SumMetric()  # number of speaker change hits
 
-        self.stats = [self.fnr, self.fpr, self.wer, self.spch_er, self.samples]
+        self.fp = SumMetric()  # number of speaker change false negatives
+        self.fn = SumMetric()  # number of speaker change false positives
+        self.spch = SumMetric()  # number of speaker changes
+        self.word = SumMetric()  # number of words (non-speaker-change)
+
+        self.error = SumMetric()  # number of errors computed by wer
+        self.total = SumMetric()  # number of total computed by wer
+        self.samples = SumMetric()  # number of samples
+
+        self.stats = [self.i, self.d, self.s, self.c, self.fp, self.fn,
+                      self.spch, self.word, self.error, self.total,  self.samples]
 
         if prefix is None:
             self.prefix = ""
@@ -50,20 +55,18 @@ class SpeakerChangeStats():
             self.prefix = f"{prefix}_"
 
     def __call__(self, preds: Union[str, List[str]], target: Union[str, List[str]]) -> None:
-        self.update(preds, target)
+        self._update_stats(preds, target)
 
     def compute_and_reset(self) -> Dict[str, float]:
         computed_stats = {
-            f"{self.prefix}fnr": (self.fnr / self.samples).compute(),
-            f"{self.prefix}fpr": (self.fpr / self.samples).compute(),
-            f"{self.prefix}spch_er": (self.spch_er / self.samples).compute(),
-            f"{self.prefix}wer": (self.wer / self.samples).compute(),
+            f"{self.prefix}fnr": _fnr(self.fn, self.spch),
+            f"{self.prefix}fpr": _fpr(self.fp, self.word),
+            f"{self.prefix}wer": (self.error / self.total).compute(),
+            f"{self.prefix}fp": (self.fp / self.samples).compute(),
+            f"{self.prefix}fn": (self.fn / self.samples).compute(),
         }
         self.reset()
         return computed_stats
-
-    def update(self, preds: Union[str, List[str]], target: Union[str, List[str]]) -> None:
-        self._update_stats(preds, target)
 
     def _operation_counts(self, pralign: List[str]) -> Tuple[int, int, int, int, int, int]:
         c, i, d, s, fn, fp = [0] * 6
@@ -102,17 +105,23 @@ class SpeakerChangeStats():
 
         for prd, tgt in zip(preds, target):
             # Compute operation counts
-            wer = WER(tgt.split(), prd.split())
-            pralign = np.array(wer.pralign())
-            c, i, d, s, fn, fp = self._operation_counts(pralign)
-            spch = s + d + c
-            words = len(pralign[0])
+            tgt, prd = tgt.split(), prd.split()
+            wer = WER(tgt, prd)
+            c, i, d, s, fn, fp = self._operation_counts(wer.pralign())
 
             # Update stats
-            self.fnr.update(_fnr(fn=fn, spch=spch))
-            self.fpr.update(_fpr(fp=fp, words=words, spch=spch))
-            self.wer.update(wer.wer())
-            self.spch_er.update(_spch_er(s=s, i=i, d=d, spch=spch))
+            self.i.update(i)
+            self.d.update(d)
+            self.s.update(s)
+            self.c.update(c)
+
+            self.fp.update(fp)
+            self.fn.update(fn)
+            self.spch.update(s + d + c)
+            self.word.update(len(tgt) - s - d - c)
+
+            self.error.update(wer.nerr)
+            self.total.update(len(tgt))
             self.samples.update(1)
         return
 

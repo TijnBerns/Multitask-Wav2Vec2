@@ -1,6 +1,8 @@
+from importlib import util
 from config import Config
 from typing import List, Any, Dict
 from metrics import SpeakerChangeStats
+
 
 from transformers import Wav2Vec2ForCTC, Wav2Vec2CTCTokenizer, Wav2Vec2FeatureExtractor, Wav2Vec2Processor
 import torch
@@ -9,11 +11,12 @@ import pytorch_lightning as pl
 
 def load_processor() -> Wav2Vec2Processor:
     tokenizer = Wav2Vec2CTCTokenizer(
-        "src/models/vocab.json", unk_token="<unk>", pad_token="<pad>", word_delimiter_token="|")
+        "src/models/vocab_spch.json", unk_token="<unk>", pad_token="<pad>", word_delimiter_token="|")
     feature_extractor = Wav2Vec2FeatureExtractor(
         feature_size=1, sampling_rate=Config.sample_rate, padding_value=0.0, do_normalize=True, return_attention_mask=False)
     processor = Wav2Vec2Processor(
         feature_extractor=feature_extractor, tokenizer=tokenizer)
+    # processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base-960h")
     return processor
 
 

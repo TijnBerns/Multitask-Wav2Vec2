@@ -5,7 +5,7 @@ import torch
 import random
 from tqdm import tqdm
 from config import Config
-import data
+import data.data as data
 from typing import List
 
 wav_idx = 0

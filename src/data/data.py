@@ -1,10 +1,11 @@
 
+from pickle import TRUE
 import torch
 from pathlib import Path
 import torchaudio
 from config import Config
 from torch.nn.utils.rnn import pad_sequence
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader, RandomSampler, SequentialSampler
 import itertools
 from typing import Union, List
 
@@ -33,7 +34,6 @@ class CustomLibriSpeechDataset(Dataset):
 
         self.speaker_change = speaker_change
         self.samples = self._load_samples()
-        
 
     def _load_transcription(self, file_name: Path, ids: list):
         trans_file = file_name.parent / ("-".join(ids[:-1]) + '.trans.txt')
@@ -50,12 +50,13 @@ class CustomLibriSpeechDataset(Dataset):
 
                 transcription = trans[:-1]  # Removes the newline character
                 if not self.speaker_change:
-                    transcription = transcription.replace(f"{Config.speaker_change_symbol}", "")
-                
-                return transcription
-                    
-        raise ValueError(f"Could not find transcription of {speaker_book_id} in {trans_file}.")
+                    transcription = transcription.replace(
+                        f"{Config.speaker_change_symbol}", "")
 
+                return transcription
+
+        raise ValueError(
+            f"Could not find transcription of {speaker_book_id} in {trans_file}.")
 
     def _load_samples(self):
         file_names = [list(dir.rglob("*.flac")) for dir in self.root_dir]
@@ -74,6 +75,34 @@ class CustomLibriSpeechDataset(Dataset):
         return self.samples[idx].load_sample()
 
 
+class CustomLoader(object):
+    def __init__(self, dataset: Dataset, max_tokens: int, drop_last: bool, shuffle: bool, collate_fn):
+        self.ds = dataset
+        self.max_tokens = max_tokens
+        self.drop_last = drop_last
+        if shuffle:
+            self.sampler = RandomSampler(dataset)
+        else:
+            self.sampler = SequentialSampler(dataset)
+        self.collate_fn = collate_fn
+
+    def __iter__(self):
+        batch = []
+        added_tokens = 0
+        for idx in self.sampler:
+            num_tokens = self.ds[idx][0].size()[-1]
+            if added_tokens + num_tokens > self.max_tokens:
+                yield self.collate_fn(batch)
+                added_tokens = 0
+                batch = [self.ds[idx]]
+            else:
+                batch.append(self.ds[idx])
+                added_tokens += num_tokens
+
+        if len(batch) > 0 and not self.drop_last:
+            yield self.collate_fn(batch)
+
+
 def pad_collate(batch):
     xx, sample_rate, yy, id1, id2, id3 = zip(*batch)
     xx = [x.flatten() for x in xx]
@@ -82,11 +111,11 @@ def pad_collate(batch):
 
 
 def initialize_loader(dataset, shuffle: bool):
-    dataloader = torch.utils.data.DataLoader(
+    dataloader = DataLoader(
         dataset,
-        batch_size=Config.batch_size,
-        shuffle=shuffle,
         num_workers=Config.num_workers,
+        shuffle=shuffle,
+        drop_last=False,
         collate_fn=pad_collate,
     )
     return dataloader

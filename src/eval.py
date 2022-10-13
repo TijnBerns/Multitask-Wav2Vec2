@@ -1,11 +1,11 @@
 import click
 import utils
-import data
+import data.data as data
 from config import Config
 
 import torchaudio
 from pathlib import Path
-import models.wav2vec2
+import models.wav2vec2_spch
 import pytorch_lightning as pl
 import torchaudio
 import json
@@ -30,32 +30,21 @@ datasets = {
         Config.datapath + '/test-clean-rep']),
     "test-clean": torchaudio.datasets.LIBRISPEECH(
         Config.datapath, url="test-clean", download=True),
-    "dev-full*": data.CustomLibriSpeechDataset([
-        Config.datapath + '/dev-clean-no-rep',
-        Config.datapath + '/dev-clean-rep'], speaker_change=False),
-    "dev-rep*": data.CustomLibriSpeechDataset([
-        Config.datapath + '/dev-clean-rep'], speaker_change=False),
-    "test-full*": data.CustomLibriSpeechDataset([
-        Config.datapath + '/test-clean-no-rep',
-        Config.datapath + '/test-clean-rep'], speaker_change=False),
-    "test-rep*": data.CustomLibriSpeechDataset([
-        Config.datapath + '/test-clean-rep'], speaker_change=False),
-
 }
 
 
 @click.command()
-@click.option("--checkpoint_path", default=None, help="Path to model checkpoint. If None, finetuned wav2vec2 model is used.")
-def eval(checkpoint_path: str):
+@click.option("--checkpoint_path", default=None)
+def eval(checkpoint_path: str = None):
     device, _ = utils.set_device()
-
+    
     # Load wav2vec2 module from checkpoint
     if checkpoint_path is not None:
-        wav2vec2_module = models.wav2vec2.Wav2Vec2Module.load_from_checkpoint(
+        wav2vec2_module = models.wav2vec2_spch.Wav2Vec2Module.load_from_checkpoint(
             checkpoint_path)
         ckpt_version = int(Path(checkpoint_path).parts[-3][-7:])
     else:
-        wav2vec2_module = models.wav2vec2.Wav2Vec2Module()
+        wav2vec2_module = models.wav2vec2_spch.Wav2Vec2Module()
         ckpt_version = 0
 
     print(f"Evaluating version {ckpt_version:0>7}:")

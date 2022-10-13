@@ -1,7 +1,7 @@
 from config import Config
-import data
+import data.data as data
 import utils
-import models.wav2vec2
+import models.wav2vec2_spch
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
 
@@ -32,7 +32,7 @@ def main(device: str, jobid: str):
     )
 
     # Load wav2vec2 module
-    wav2vec2_module = models.wav2vec2.Wav2Vec2Module(num_epochs=Config.num_epochs,
+    wav2vec2_module = models.wav2vec2_spch.Wav2Vec2Module(num_epochs=Config.num_epochs,
                                                      lr_stage_one=Config.lr_stage_one,
                                                      lr_stage_two=Config.lr_stage_two,
                                                      batch_size=Config.batch_size,

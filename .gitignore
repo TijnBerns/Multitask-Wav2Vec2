@@ -1,6 +1,6 @@
 
-data
-/data
+# data
+# /data
 # models
 # /models
 logs
@@ -11,6 +11,8 @@ checkpoints
 /checkpoints
 lightning_logs
 /lightning_logs
+stash
+/stash
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

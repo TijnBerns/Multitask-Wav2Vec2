@@ -12,5 +12,6 @@ pydub
 click
 pytorch_lightning
 torchmetrics
+torch_geometric
 
 git+https://github.com/davidavdav/WordErrorRate.py.git
