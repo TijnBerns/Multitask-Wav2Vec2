@@ -1,19 +1,39 @@
+
 from config import Config
-import data.data as data
+import data.datasets as data
 import utils
-import models.wav2vec2_spch
+import models.wav2vec2
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
+import click
+from typing import Union, List
 
 
-def main(device: str, jobid: str):
+@click.command()
+@click.option("--train_data", default=[
+    "/scratch/tberns/asr/data/train-clean-no-rep",
+    "/scratch/tberns/asr/data/train-clean-rep"], type=list, 
+    help="List or string of path(s) on which is trained.")
+@click.option("--val_data" , default=[
+    "/scratch/tberns/asr/data/val-clean-no-rep",
+    "/scratch/tberns/asr/data/val-clean-rep"], type=list ,
+    help="List or string of path(s) on which is validated.")
+@click.option("--train_trans", default=None,
+              help="List or string of path(s) in which train transcriptions are stored.")
+@click.option("--val_trans", default=None,
+              help="List or string of path(s) in which validation transcriptions are stored.")
+@click.option("--vocab_path", default="src/models/vocab_spid.json", help="Path to the model vocab file.")
+def main(train_data: Union[List[str], str], val_data: Union[List[str], str], vocab_path: str,
+         train_trans: Union[List[str], str, None] = None, val_trans: Union[List[str], str, None] = None):
+    device, _ = utils.set_device()
+
     # Load datasets
-    train_set = data.CustomLibriSpeechDataset([
-        Config.datapath + '/train-clean-no-rep',
-        Config.datapath + '/train-clean-rep'])
-    val_set = data.CustomLibriSpeechDataset([
-        Config.datapath + '/val-clean-no-rep',
-        Config.datapath + '/val-clean-rep'])
+    if "LibriSpeech/train-clean-100" in train_data:
+        train_tmp = data.CustomLibriSpeechDataset(train_data, train_trans)
+        train_set, val_set = data.split_dataset(train_tmp, Config.train_split)
+    else:
+        train_set = data.CustomLibriSpeechDataset(train_data, train_trans)
+        val_set = data.CustomLibriSpeechDataset(val_data, val_trans)
 
     # Initialize dataloaders
     train_loader = data.initialize_loader(train_set, shuffle=True)
@@ -32,11 +52,12 @@ def main(device: str, jobid: str):
     )
 
     # Load wav2vec2 module
-    wav2vec2_module = models.wav2vec2_spch.Wav2Vec2Module(num_epochs=Config.num_epochs,
+    wav2vec2_module = models.wav2vec2.Wav2Vec2Module(num_epochs=Config.num_epochs,
                                                      lr_stage_one=Config.lr_stage_one,
                                                      lr_stage_two=Config.lr_stage_two,
                                                      batch_size=Config.batch_size,
-                                                     stage=1)
+                                                     stage=1,
+                                                     vocab_path=vocab_path)
     wav2vec2_module = wav2vec2_module.to(device)
 
     # First stage
@@ -64,5 +85,4 @@ def main(device: str, jobid: str):
 
 
 if __name__ == "__main__":
-    device, jobid = utils.set_device()
-    main(device, jobid)
+    main()

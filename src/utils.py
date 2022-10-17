@@ -13,15 +13,16 @@ def json_dump(path: Union[str, Path], data: Any) -> None:
 
 
 def write_dict_list(path: str, data: List[Dict]) -> None:
-    df = pd.DataFrame(data)
-    df.to_csv(path)
+    with open(path, 'w') as f:
+        f.write(','.join(data[0].keys()) + '\n')
+        for entry in data:
+            f.write(','.join(entry.values()) + '\n')
+        
+        
+    
+    # df = pd.DataFrame(data)
+    # df.to_csv(path)
     return
-
-
-def remove_speaker_change_symbol(transcriptions: List[str]) -> List[str]:
-    transcriptions = map(lambda x: x.replace(
-        Config.speaker_change_symbol, ''), transcriptions)
-    return list(transcriptions)
 
 
 def set_device() -> Tuple[str, str]:

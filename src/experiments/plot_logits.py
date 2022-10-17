@@ -1,10 +1,10 @@
 import click
 import utils
-import data.data as data
+import data.datasets as datasets
 from config import Config
 
 from pathlib import Path
-import models.wav2vec2_spch
+import models.wav2vec2
 import torch
 import matplotlib.pyplot as plt
 import json
@@ -46,7 +46,7 @@ def plot_logit_matrix(data2d: List[List[float]], path: str, title: str) -> None:
 @click.option("--checkpoint_path", default="/home/tberns/Speaker_Change_Recognition/lightning_logs/version_2394591/checkpoints/epoch_0018.step_000364363.val-loss_0.0319.last.ckpt", help="Path to model checkpoint. If None, finetuned wav2vec2 model is used.")
 def main(checkpoint_path: str = None):
     device, _ = utils.set_device()
-    wav2vec2_module: models.wav2vec2_spch.Wav2Vec2Module = models.wav2vec2_spch.Wav2Vec2Module.load_from_checkpoint(
+    wav2vec2_module: models.wav2vec2.Wav2Vec2Module = models.wav2vec2.Wav2Vec2Module.load_from_checkpoint(
         checkpoint_path)
     ckpt_version = int(Path(checkpoint_path).parts[-3][-7:])
 
@@ -55,9 +55,9 @@ def main(checkpoint_path: str = None):
     wav2vec2_module = wav2vec2_module.to(device)
 
     # Dataset
-    dataset = data.CustomLibriSpeechDataset(
+    dataset = dataset.CustomLibriSpeechDataset(
         [Config.datapath + '/dev-clean-no-rep'])
-    dataloader = data.initialize_loader(dataset, shuffle=False)
+    dataloader = dataset.initialize_loader(dataset, shuffle=False)
 
     # Variables used saving matrix and taking means
     vocab_size = 33

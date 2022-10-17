@@ -8,7 +8,7 @@
 #SBATCH --error=./logs/slurm/%J.err
 
 
-project_dir=.
+project_dir=../
 
 # execute train CLI
 source "$project_dir"/venv/bin/activate
