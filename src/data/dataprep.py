@@ -1,15 +1,14 @@
 import sys
 sys.path.append('src')
-
-from data.pairgenerator import PairGeneratorRepeat, PairGeneratorNoRepeat
-import data.utils
-import data.datasets as datasets
-from typing import List, Union, Dict
-from config import Config
-import random
-from pathlib import Path
 import click
-
+from pathlib import Path
+import random
+from config import Config
+from typing import List, Union, Dict
+import data.datasets as datasets
+import data.utils
+from data.pairgenerator import PairGeneratorRepeat, PairGeneratorNoRepeat
+from tqdm import tqdm
 
 
 def merge_dataset(dataset, dataset_str: str, num_samples: int) -> None:
@@ -32,38 +31,24 @@ def merge_dataset(dataset, dataset_str: str, num_samples: int) -> None:
 
 
 def transcribe_libri_clean():
-    librispeach_clean_path = Path(Config.datapath) / "LibriSpeech"
-    train_clean_100_path = librispeach_clean_path / 'train-clean-100'
-    test_clean_path = librispeach_clean_path / 'test-clean'
-    dev_clean_path = librispeach_clean_path / 'dev-clean'
-
-    datapaths = [train_clean_100_path, test_clean_path, dev_clean_path]
-
-    for path in datapaths:
-        for trans_file in list(path.glob("*trans.csv")):
-            trans_file.unlink()
-
-        data.utils.write_trans_clean(path)
-
-    datapaths.extend([Path(Config.datapath) / "dev-clean-rep",
-                      Path(Config.datapath) / "dev-clean-no-rep",
-                      Path(Config.datapath) / "val-clean-rep",
-                      Path(Config.datapath) / "val-clean-no-rep",
-                      Path(Config.datapath) / "test-clean-rep",
-                      Path(Config.datapath) / "test-clean-no-rep",
-                      Path(Config.datapath) / "train-clean-rep",
-                      Path(Config.datapath) / "train-clean-no-rep",
-                      ])
-
-    for path in datapaths:
-        data.utils.write_trans_from_source(path / "trans.csv",
-                                           target_trans=path / "trans-st.csv",
+    
+    for dataset_str, dataset in tqdm(datasets.clean_datasets.items(), desc="Writing transcriptions for clean datasets"):
+        data.utils.write_trans_clean(dataset, dataset_str, Config.datapath + "/LibriSpeech")
+        
+    trans_files = Path(Config.datapath).rglob("*trans.csv")
+    
+    for trans_file in tqdm(trans_files, desc="Writing additional transcription files"):
+        path = trans_file.parent
+        name = trans_file.name[:-4]
+        
+        data.utils.write_trans_from_source(source_trans=trans_file,
+                                           target_trans=path / f"{name}-st.csv",
                                            trans_fn=data.utils.add_speaker_start)
-        data.utils.write_trans_from_source(path / "trans-st.csv",
-                                           target_trans=path / "trans-id.csv",
+        data.utils.write_trans_from_source(path / f"{name}-st.csv",
+                                           target_trans=path / f"{name}-id.csv",
                                            trans_fn=data.utils.add_speaker_ids)
-        data.utils.write_trans_from_source(path / "trans-st.csv",
-                                           target_trans=path / "trans-st-id.csv",
+        data.utils.write_trans_from_source(path / f"{name}-st.csv",
+                                           target_trans=path / f"{name}-st-id.csv",
                                            trans_fn=lambda x: data.utils.add_speaker_ids(x, True))
 
 

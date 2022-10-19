@@ -11,29 +11,17 @@ from typing import Union, List
 import pandas as pd
 
 
-
-
 class CustomLibriSpeechDataset(Dataset):
-    def __init__(self, root_dir: Union[str, List[str]], trans_file: Union[None, str, List[str]] = None) -> None:
+    def __init__(self, trans_file: Union[list, str]) -> None:
         super().__init__()
 
-        if type(root_dir) == str:
-            self.root_dir = [Path(root_dir)]
-        elif type(root_dir) == list:
-            self.root_dir = list(map(Path, root_dir))
-        else:
-            raise ValueError(
-                f"Exptected root_dir to be of type str or list but got {type(trans_file)}.")
-
-        if trans_file is None:
-            self.trans_file = [d / "trans.csv" for d in self.root_dir]
-        elif type(trans_file) == str:
-            self.trans_file = [Path(trans_file)]
+        if type(trans_file) == str:
+            self.trans_file = [trans_file]
         elif type(trans_file) == list:
-            self.trans_file = list(map(Path, trans_file))
+            self.trans_file = trans_file
         else:
             raise ValueError(
-                f"Exptected trans_file to be of type None, str, or list but got {type(trans_file)}.")
+                f"Exptected trans_file to be of type None or str but got {type(trans_file)}.")
 
         self.samples: List[LirbriSpeechItem] = self._load_samples()
 
@@ -43,13 +31,8 @@ class CustomLibriSpeechDataset(Dataset):
         return transcriptions
 
     def _load_samples(self):
-        file_names = [list(dir.rglob("*.flac")) for dir in self.root_dir]
-        file_names = list(itertools.chain(*file_names))
-
         transcriptions = self._load_transcriptions()
-        assert len(file_names) == len(transcriptions)
-
-        samples = [0] * len(file_names)
+        samples = [0] * len(transcriptions)
         for i, sample in enumerate(transcriptions.iterrows()):
             sample = sample[1]
             samples[i] = LirbriSpeechItem(file_name=sample["path"],
@@ -76,7 +59,7 @@ class LirbriSpeechItem(object):
 
     def load_sample(self):
         waveform, sample_rate = torchaudio.load(self.file_name)
-        return (waveform, sample_rate, self.transcription, self.speaker_id, self.book_id, self.utterance_id)
+        return (waveform, sample_rate, self.transcription, self.speaker_id, self.book_id, self.utterance_id, self.file_name)
 
 
 class CustomLoader(object):
@@ -119,10 +102,10 @@ def initialize_loader(dataset, shuffle: bool):
 
 
 def _pad_collate(batch):
-    xx, sample_rate, yy, id1, id2, id3 = zip(*batch)
+    xx, sample_rate, yy, id1, id2, id3, sp = zip(*batch)
     xx = [x.flatten() for x in xx]
     xx_pad = pad_sequence(xx, batch_first=True, padding_value=0)
-    return {"waveform": xx_pad, "transcription": list(yy), "id1": id1, "id2": id2, "id3": id3}
+    return {"waveform": xx_pad, "transcription": list(yy), "id1": id1, "id2": id2, "id3": id3, "sample_path": sp}
 
 
 def split_dataset(dataset, percentage: float):
@@ -149,7 +132,9 @@ def _get_split_index(dataset, start_index):
         split_index += 1
     return split_index
 
-train_tmp = torchaudio.datasets.LIBRISPEECH(root=Config.datapath, url="train-clean-100")
+
+train_tmp = torchaudio.datasets.LIBRISPEECH(
+    root=Config.datapath, url="train-clean-100")
 train_set, val_set = split_dataset(train_tmp, Config.train_split)
 
 clean_datasets = {"train-clean-100": train_set,

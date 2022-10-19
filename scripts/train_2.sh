@@ -9,9 +9,9 @@
 
 project_dir=.
 
-# Train on train-clean-full with speaker change symbols
+# Train on train-clean-full with speaker ids instead of speaker change symbols
 source "$project_dir"/venv/bin/activate
 python "$project_dir"/src/train.py \
-    --train_trans=trans.csv \
-    --val_trans=trans.csv \
-    --vocab_path=/home/tberns/Speaker_Change_Recognition/src/models/vocab_spch.json
+    --train_trans=trans-id.csv \
+    --val_trans=trans-st.csv \
+    --vocab_path=/home/tberns/Speaker_Change_Recognition/src/models/vocab_spid.json

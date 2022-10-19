@@ -60,8 +60,11 @@ class Wav2Vec2Module(pl.LightningModule):
         self.lr_stage_two: float = lr_stage_two
         self.min_lr: float = min_lr
         self.batch_size: int = batch_size
-
-    def _train_val_step(self, waveform: torch.Tensor, transcription: List[str]):
+        
+    def _forward(self, batch):
+        waveform = batch['waveform']
+        transcription = batch['transcription']
+        
         # Retrieve input values
         input_values = self.processor(
             waveform, sampling_rate=16_000, return_tensors="pt", padding="longest").input_values
@@ -76,28 +79,51 @@ class Wav2Vec2Module(pl.LightningModule):
 
         # Compute loss by passing labels
         output = self.model(input_values, labels=labels)
-
-        # Compute and evaluate hypothesis
-        # logits = torch.cat((output.logits[:, :, :32],
-        #                     torch.sum(output.logits[:, :, 32:], dim=2).reshape((1, -1, 1))), dim=2)
-        logits = output.logits
+        
+        return output
+    
+    def _process_logits(self, logits):
+        if logits.shape[-1] > 32:
+            logits = torch.cat((logits[:, :, :32],
+                        torch.sum(logits[:, :, 33:], dim=2).reshape((1, -1, 1))), dim=2)
+            
         predicted_ids = torch.argmax(logits, dim=-1)
         hypothesis = self.processor.batch_decode(predicted_ids)
-        return output, hypothesis
+        return hypothesis
+
+    # def _train_val_step(self, waveform: torch.Tensor, transcription: List[str]):
+    #     # Retrieve input values
+    #     input_values = self.processor(
+    #         waveform, sampling_rate=16_000, return_tensors="pt", padding="longest").input_values
+    #     input_values = torch.reshape(
+    #         input_values, (len(waveform), -1)).to(self.device)
+
+    #     # Retrieve target labels
+    #     with self.processor.as_target_processor():
+    #         labels = self.processor(transcription, padding=True,
+    #                                 return_tensors='pt').input_ids
+    #         labels = labels.to(self.device)
+
+    #     # Compute loss by passing labels
+    #     output = self.model(input_values, labels=labels)
+
+    #     # Compute and evaluate hypothesis
+    #     # logits = torch.cat((output.logits[:, :, :32],
+    #     #                     torch.sum(output.logits[:, :, 33:], dim=2).reshape((1, -1, 1))), dim=2)
+    #     predicted_ids = torch.argmax(output.logits, dim=-1)
+    #     hypothesis = self.processor.batch_decode(predicted_ids)
+    #     return output, hypothesis
 
     def training_step(self, batch, batch_idx):
-        waveform = batch['waveform']
-        transcription = batch['transcription']
-        output, hypothesis = self._train_val_step(waveform, transcription)
+        output = self._forward(batch)
         self.log("train_loss", output.loss, batch_size=self.batch_size)
         return output.loss
 
     def validation_step(self, batch, batch_idx):
-        waveform = batch['waveform']
-        transcription = batch['transcription']
-        output, hypothesis = self._train_val_step(waveform, transcription)
+        output = self._forward(batch)
+        hypothesis = self._process_logits(output.logits)
 
-        self.val_stats(hypothesis, transcription)
+        self.val_stats(hypothesis, batch['transcription'])
         self.log("val_loss", output.loss, batch_size=self.batch_size)
         return output.loss
 
@@ -106,10 +132,10 @@ class Wav2Vec2Module(pl.LightningModule):
         return
 
     def test_step(self, batch, batch_idx):
-        waveform = batch['waveform']
-        transcription = batch['transcription']
-        output, hypothesis = self._train_val_step(waveform, transcription)
-
+        output = self.forward(batch)
+        transcription = batch["transcription"]
+        hypothesis = self._process_logits(output.logits)
+        
         for trans, hyp in zip(transcription, hypothesis):
             self.test_preds.append({
                 "reference": trans,
@@ -130,14 +156,14 @@ class Wav2Vec2Module(pl.LightningModule):
         self.model.lm_head.requires_grad_(True)
         return
 
-    def trim_lm_head(self):
-        self.processor, self.vocab_size = load_processor()
-        lm_head_weigth = self.model.lm_head.weight[0:self.vocab_size, :]
-        lm_head_bias = self.model.lm_head.bias[0:self.vocab_size]
-        self.model.lm_head = torch.nn.Linear(
-            in_features=768, out_features=self.vocab_size)
-        self.model.lm_head.weight = torch.nn.Parameter(lm_head_weigth.clone())
-        self.model.lm_head.bias = torch.nn.Parameter(lm_head_bias.clone())
+    # def trim_lm_head(self):
+    #     self.processor, self.vocab_size = load_processor()
+    #     lm_head_weigth = self.model.lm_head.weight[0:self.vocab_size, :]
+    #     lm_head_bias = self.model.lm_head.bias[0:self.vocab_size]
+    #     self.model.lm_head = torch.nn.Linear(
+    #         in_features=768, out_features=self.vocab_size)
+    #     self.model.lm_head.weight = torch.nn.Parameter(lm_head_weigth.clone())
+    #     self.model.lm_head.bias = torch.nn.Parameter(lm_head_bias.clone())
 
     def configure_optimizers(self) -> None:
         # setup the optimization algorithm

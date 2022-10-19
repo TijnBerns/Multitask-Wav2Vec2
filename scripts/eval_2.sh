@@ -15,9 +15,9 @@ if [ $# -eq 0 ]
     echo "No checkpoint path provided."
     exit 1
 
-# Evaluate on clean dev set with 
+# Train on dev-full with speaker ids instead of speaker change symbols
 source "$project_dir"/venv/bin/activate
 python "$project_dir"/src/eval.py --checkpoint_path=$1 \
-    --trans_path=/scratch/tberns/asr/data/LibriSpeech/dev-clean/trans-st.csv \
+    --trans_file=trans-st.csv \
     --vocab_path=/home/tberns/Speaker_Change_Recognition/src/models/vocab_spid.json \
     --asr_only=True

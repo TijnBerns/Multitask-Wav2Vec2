@@ -10,30 +10,20 @@ from typing import Union, List
 
 
 @click.command()
-@click.option("--train_data", default=[
-    "/scratch/tberns/asr/data/train-clean-no-rep",
-    "/scratch/tberns/asr/data/train-clean-rep"], type=list, 
-    help="List or string of path(s) on which is trained.")
-@click.option("--val_data" , default=[
-    "/scratch/tberns/asr/data/val-clean-no-rep",
-    "/scratch/tberns/asr/data/val-clean-rep"], type=list ,
-    help="List or string of path(s) on which is validated.")
-@click.option("--train_trans", default=None,
+@click.option("--train_trans", multiple=True,
               help="List or string of path(s) in which train transcriptions are stored.")
-@click.option("--val_trans", default=None,
+@click.option("--val_trans", multiple=True, 
               help="List or string of path(s) in which validation transcriptions are stored.")
-@click.option("--vocab_path", default="src/models/vocab_spid.json", help="Path to the model vocab file.")
-def main(train_data: Union[List[str], str], val_data: Union[List[str], str], vocab_path: str,
-         train_trans: Union[List[str], str, None] = None, val_trans: Union[List[str], str, None] = None):
+@click.option("--vocab_path", default="src/models/vocab_spid.json", 
+              help="Path to the model vocab file.")
+def main(train_trans: Union[List[str], str, None], val_trans: Union[List[str], str, None], vocab_path: str,):
     device, _ = utils.set_device()
+    train_trans = list(train_trans)
+    val_trans = list(val_trans)
 
     # Load datasets
-    if "LibriSpeech/train-clean-100" in train_data:
-        train_tmp = data.CustomLibriSpeechDataset(train_data, train_trans)
-        train_set, val_set = data.split_dataset(train_tmp, Config.train_split)
-    else:
-        train_set = data.CustomLibriSpeechDataset(train_data, train_trans)
-        val_set = data.CustomLibriSpeechDataset(val_data, val_trans)
+    train_set = data.CustomLibriSpeechDataset(train_trans)
+    val_set = data.CustomLibriSpeechDataset(val_trans)
 
     # Initialize dataloaders
     train_loader = data.initialize_loader(train_set, shuffle=True)

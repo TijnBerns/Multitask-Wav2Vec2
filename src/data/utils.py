@@ -8,14 +8,16 @@ from data.datasets import CustomLibriSpeechDataset
 from typing import List, Union, Dict
 import pandas as pd
 import re
+from torch.utils.data.dataset import Subset
 
 
 wav_idx = 0
 srate_idx = 1
-trans = 2
+trans_idx = 2
 speaker_idx = 3
 book_idx = 4
-snr_idx = 5
+ut_idx = 5
+sample_path_idx = 6
 
 vocab_base = {"<pad>": 0, "<s>": 1, "</s>": 2, "<unk>": 3,
               "|": 4, "E": 5, "T": 6, "A": 7, "O": 8,
@@ -40,17 +42,31 @@ def save_pairs(root: Path, merged_pairs: List) -> None:
         write_trans(root, sample_path, id1, id2, id3, transcription)
 
 
-def write_trans_clean(root: Path) -> None:
-    """Write a transcription file similar to the custom dataset transcriptions
-    """
-    trans_files = list(root.rglob("*.trans.txt"))
-    for trans_file in trans_files:
-        with trans_file.open("r") as f:
-            for line in f.readlines():
-                ids, trans = line[:-1].split(maxsplit=1)
-                id1, id2, id3 = ids.split('-')
-                sample_path = trans_file.parent / f'{id1}-{id2}-{id3}.flac'
-                write_trans(root, sample_path,  id1, id2, id3, trans)
+# def write_trans_clean(root: Path) -> None:
+#     """Write a transcription file similar to the custom dataset transcriptions
+#     """
+#     trans_files = list(root.rglob("*.trans.txt"))
+#     for trans_file in trans_files:
+#         with trans_file.open("r") as f:
+#             for line in f.readlines():
+#                 ids, trans = line[:-1].split(maxsplit=1)
+#                 id1, id2, id3 = ids.split('-')
+#                 sample_path = trans_file.parent / f'{id1}-{id2}-{id3}.flac'
+#                 write_trans(root, sample_path,  id1, id2, id3, trans)
+
+def write_trans_clean(dataset, dataset_str: str, target_trans: str):
+    if isinstance(dataset, Subset):
+        root = Path(dataset.dataset._path)
+    else:
+        root = Path(dataset._path)
+        
+    for sample in tqdm(dataset, f"writing transcription for {dataset_str}"):
+        id1 = str(sample[speaker_idx])
+        id2 = str(sample[book_idx])
+        id3 = str(sample[ut_idx])
+        trans = sample[trans_idx]
+        sample_path = root / id1 / id2 / f"{id1}-{id2}-{id3:0>4}.flac"
+        write_trans(Path(target_trans), sample_path,  id1, id2, id3, trans, prefix=dataset_str)
 
 
 def write_trans(root: Path, sample_path: Path, id1: str, id2: str, id3: str,
@@ -69,7 +85,7 @@ def write_trans(root: Path, sample_path: Path, id1: str, id2: str, id3: str,
     if prefix is None:
         trans_file = root / f"trans.csv"
     else:
-        trans_file = root / f"{prefix}_trans.csv"
+        trans_file = root / f"{prefix}.trans.csv"
 
     if not trans_file.exists():
         trans_file.touch()
@@ -156,10 +172,10 @@ def write_speaker_id_vocab(dataset: CustomLibriSpeechDataset,
 def _gen_spid_vocab_dict(speaker_ids: List[Union[str, int]]):
     vocab = dict(vocab_base)
     start_logit = max(vocab.values()) + 1
-    
+
     vocab["#"] = start_logit
     start_logit += 1
-    
+
     for i, speaker_id in enumerate(speaker_ids):
         vocab[str(speaker_id)] = start_logit + i
     return vocab
@@ -168,7 +184,7 @@ def _gen_spid_vocab_dict(speaker_ids: List[Union[str, int]]):
 # def _gen_spch_vocab_dict(num_speaker_ids: int):
 #     vocab = dict(vocab_base)
 #     start_logit = max(vocab.values()) + 1
-    
+
 #     vocab[Config.speaker_change_symbol] = start_logit
 #     for i in range(1, num_speaker_ids):
 #         vocab[f"<unk-{i}>"] = start_logit + i
