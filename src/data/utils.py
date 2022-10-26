@@ -82,6 +82,7 @@ def write_trans(root: Path, sample_path: Path, id1: str, id2: str, id3: str,
         transcription (str): The transcription.
         prefix (str, optional): If provided, add prefix to saved csv file. By default file is saved as trans.csv.
     """
+    transcription = transcription.lower()
     if prefix is None:
         trans_file = root / f"trans.csv"
     else:

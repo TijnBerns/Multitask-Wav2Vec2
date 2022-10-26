@@ -13,7 +13,7 @@ class Config():
     lr_stage_one: float = 1e-3
     lr_stage_two: float = 1e-5
     num_epochs = 20
-    num_epochs_stage_one = 1
+    num_epochs_stage_one = 0
     num_epochs_stage_two = num_epochs - num_epochs_stage_one
     assert num_epochs_stage_two >= 0
 

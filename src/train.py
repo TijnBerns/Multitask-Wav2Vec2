@@ -14,7 +14,7 @@ from typing import Union, List
               help="List or string of path(s) in which train transcriptions are stored.")
 @click.option("--val_trans", multiple=True, 
               help="List or string of path(s) in which validation transcriptions are stored.")
-@click.option("--vocab_path", default="src/models/vocab_spid.json", 
+@click.option("--vocab_path", default=None, 
               help="Path to the model vocab file.")
 def main(train_trans: Union[List[str], str, None], val_trans: Union[List[str], str, None], vocab_path: str,):
     device, _ = utils.set_device()
@@ -49,6 +49,7 @@ def main(train_trans: Union[List[str], str, None], val_trans: Union[List[str], s
                                                      stage=1,
                                                      vocab_path=vocab_path)
     wav2vec2_module = wav2vec2_module.to(device)
+
 
     # First stage
     wav2vec2_module.freeze_all_but_head()

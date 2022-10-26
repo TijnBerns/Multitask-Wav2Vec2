@@ -6,7 +6,54 @@ from worderrorrate import WER
 import numpy as np
 from config import Config
 from jiwer import wer as jiwer_wer
+from pyllr.pav_rocch import PAV, ROCCH
 
+################################################################################
+# helper methods for both measures
+
+def _verify_correct_scores(
+    groundtruth_scores: List[int], predicted_scores: List[float]
+):
+    if len(groundtruth_scores) != len(predicted_scores):
+        raise ValueError(
+            f"length of input lists should match, while"
+            f" groundtruth_scores={len(groundtruth_scores)} and"
+            f" predicted_scores={len(predicted_scores)}"
+        )
+    if not all(np.isin(groundtruth_scores, [0, 1])):
+        raise ValueError(
+            f"groundtruth values should be either 0 and 1, while "
+            f"they are actually one of {np.unique(groundtruth_scores)}"
+        )
+        
+
+################################################################################
+# EER (equal-error-rate)
+
+def calculate_eer(
+    groundtruth_scores: List[int], predicted_scores: List[float]
+) -> float:
+    """
+    Calculate the equal error rate between a list of groundtruth pos/neg scores
+    and a list of predicted pos/neg scores.
+    Positive ground truth scores should be 1, and negative scores should be 0.
+    :param groundtruth_scores: a list of groundtruth integer values (either 0 or 1)
+    :param predicted_scores: a list of prediction float values
+    :return: a float value containing the equal error rate and the corresponding threshold
+    """
+    _verify_correct_scores(groundtruth_scores, predicted_scores)
+
+    scores = np.asarray(predicted_scores, dtype=float)
+    labels = np.asarray(groundtruth_scores, dtype=float)
+    rocch = ROCCH(PAV(scores, labels))
+
+    eer = rocch.EER()
+
+    return float(eer)
+
+
+################################################################################
+# Speaker change metrics
 
 def _fnr(fn: SumMetric, spch: SumMetric) -> torch.tensor:   
     """Computes false negative rate only considering speaker changes
@@ -126,6 +173,16 @@ class SpeakerChangeStats():
         return
 
     def reset(self) -> None:
-        for stat in self.stats:
-            stat.reset()
-        return
+        self.i.reset()
+        self.d.reset()
+        self.s.reset()
+        self.c.reset()
+
+        self.fp.reset()
+        self.fn.reset()
+        self.spch.reset()
+        self.word.reset()
+
+        self.error.reset()
+        self.total.reset()
+        self.samples.reset()

@@ -8,8 +8,11 @@
 #SBATCH --error=./logs/slurm/%J.err
 
 
-project_dir=../
+project_dir=.
 
 # execute train CLI
 source "$project_dir"/venv/bin/activate
-python "$project_dir"/src/eval.py --checkpoint_path=$1 
+python "$project_dir"/src/eval.py \
+    --version_number=$1 \
+    --trans_file=$2 \
+    --vocab_file=$3
