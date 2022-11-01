@@ -17,36 +17,71 @@ from torch.nn.functional import normalize
 from torch.nn import CosineSimilarity
 from tqdm import tqdm
 
-from metrics import calculate_eer
+from evaluation.metrics import calculate_eer
+
+from pathlib import Path
+
 
 ################################################################################
 # define data structures required for evaluating
 
 
 @dataclass
-class EvaluationPair:
-    same_speaker: bool
-    sample1_id: str
-    sample2_id: str
+class EmbeddingSample:
+    sample_id: str
+    embedding: t.Tensor
+
+
+########################################################################################
+# Container encapsulating a speaker trial
 
 
 @dataclass
-class EmbeddingSample:
-    sample_id: str
-    embedding: Union[t.Tensor, List[t.Tensor]]
+class SpeakerTrial:
+    left: str
+    right: str
+    same_speaker: bool
 
-    def __post_init__(self):
-        if isinstance(self.embedding, list):
-            [self._verify_embedding(e) for e in self.embedding]
-        elif isinstance(self.embedding, t.Tensor):
-            self._verify_embedding(self.embedding)
-        else:
-            raise ValueError(f"unexpected {type(self.embedding)=}")
+    def __eq__(self, other):
+        if isinstance(other, SpeakerTrial):
+            return self.__hash__() == other.__hash__()
 
-    @staticmethod
-    def _verify_embedding(embedding: t.Tensor):
-        if len(embedding.shape) != 1:
-            raise ValueError("expected embedding to be 1-dimensional tensor")
+        return False
+
+    def __hash__(self):
+        return frozenset([self.left, self.right, self.same_speaker]).__hash__()
+
+    def __str__(self):
+        assert self.left.count(" ") == 0
+        assert self.right.count(" ") == 0
+
+        bool_str = str(int(self.same_speaker))
+        return f"{self.left} {self.right} {bool_str}"
+
+    def to_line(self):
+        return str(self)
+
+    @classmethod
+    def from_line(cls, line: str):
+        assert line.count(" ") == 2
+
+        left, right, bool_str = line.strip().split(" ")
+        bool_value = bool(int(bool_str))
+
+        assert len(left) > 0
+        assert len(right) > 0
+
+        return SpeakerTrial(left=left, right=right, same_speaker=bool_value)
+
+    @classmethod
+    def to_file(cls, file_path: Path, trials: List["SpeakerTrial"]):
+        with file_path.open("w") as f:
+            f.writelines([f"{tr.to_line()}\n" for tr in trials])
+
+    @classmethod
+    def from_file(cls, file_path: Path) -> List["SpeakerTrial"]:
+        with file_path.open("r") as f:
+            return [SpeakerTrial.from_line(s) for s in f.readlines()]
 
 
 ################################################################################
@@ -56,7 +91,6 @@ class EmbeddingSample:
 class CosineDistanceSimilarityModule(t.nn.Module):
     def __init__(self):
         super().__init__()
-
         self.cosine_distance = CosineSimilarity()
 
     def forward(self, embedding: t.Tensor, other_embedding: t.Tensor):
@@ -71,7 +105,7 @@ class SpeakerRecognitionEvaluator:
     @classmethod
     def evaluate(
         cls,
-        pairs: List[EvaluationPair],
+        pairs: List[SpeakerTrial],
         samples: List[EmbeddingSample],
         cohort: List[t.Tensor] = None,
         mean_embedding: Optional[t.Tensor] = None,
@@ -87,20 +121,21 @@ class SpeakerRecognitionEvaluator:
                 raise ValueError(f"duplicate key {sample.sample_id}")
 
             sample_map[sample.sample_id] = sample
+            
 
         # compute a list of ground truth scores and prediction scores
         ground_truth_scores = []
         prediction_pairs = []
 
-        for pair in pairs:
-            if pair.sample1_id not in sample_map or pair.sample2_id not in sample_map:
-                warn(f"{pair.sample1_id} or {pair.sample2_id} not in sample_map")
+        for pair in tqdm(pairs, desc='Evaluating speaker pairs'):
+            if pair.left not in sample_map or pair.right not in sample_map:
+                warn(f"{pair.left} or {pair.right} not in sample_map")
                 return {
                     "eer": -1,
                 }
 
-            s1 = sample_map[pair.sample1_id]
-            s2 = sample_map[pair.sample2_id]
+            s1 = sample_map[pair.left]
+            s2 = sample_map[pair.right]
 
             gt = 1 if pair.same_speaker else 0
 
@@ -124,7 +159,8 @@ class SpeakerRecognitionEvaluator:
             )
 
         # normalize scores to be between 0 and 1
-        prediction_scores = np.clip((np.array(prediction_scores) + 1) / 2, 0, 1)
+        prediction_scores = np.clip(
+            (np.array(prediction_scores) + 1) / 2, 0, 1)
         prediction_scores = prediction_scores.tolist()
 
         if skip_eer:
@@ -162,7 +198,8 @@ class SpeakerRecognitionEvaluator:
 
             # Optionally normalize by subtracting mean and dividing by std
             if mean_embedding is not None and std_embedding is not None:
-                enrollment = (enrollment - mean_embedding) / (std_embedding + 1e-12)
+                enrollment = (enrollment - mean_embedding) / \
+                    (std_embedding + 1e-12)
                 test = (test - mean_embedding) / (std_embedding + 1e-12)
 
             # Optionally normalize the length
@@ -193,8 +230,10 @@ class SpeakerRecognitionEvaluator:
             )
 
             score = cosine_sim(enrollment, test)[0]
-            e_norm = (score - mean_score_e_cohort_e_top) / std_score_e_cohort_e_top
-            t_norm = (score - mean_score_t_cohort_t_top) / std_score_t_cohort_t_top
+            e_norm = (score - mean_score_e_cohort_e_top) / \
+                std_score_e_cohort_e_top
+            t_norm = (score - mean_score_t_cohort_t_top) / \
+                std_score_t_cohort_t_top
 
             asnorm_scores.append(0.5 * (e_norm + t_norm))
 
@@ -211,8 +250,10 @@ class SpeakerRecognitionEvaluator:
         left_samples, right_samples = cls._transform_pairs_to_tensor(pairs)
 
         if mean_embedding is not None and std_embedding is not None:
-            left_samples = center_batch(left_samples, mean_embedding, std_embedding)
-            right_samples = center_batch(right_samples, mean_embedding, std_embedding)
+            left_samples = center_batch(
+                left_samples, mean_embedding, std_embedding)
+            right_samples = center_batch(
+                right_samples, mean_embedding, std_embedding)
 
         if length_normalize:
             left_samples = length_norm_batch(left_samples)

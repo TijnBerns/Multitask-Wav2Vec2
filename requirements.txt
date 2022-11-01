@@ -1,6 +1,11 @@
 
-torch==1.12.1
-torchaudio
+# torch==1.12.1
+# torchaudio==1.12.1
+# torchdata==0.4.1
+
+torch==1.13.0
+torchaudio==0.13.0
+torchdata==0.5.0
 
 transformers
 datasets

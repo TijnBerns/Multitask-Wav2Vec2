@@ -18,6 +18,10 @@ mkdir -p /ceph/csedu-scratch/course/IMC030_MLIP/users/"$USER"/logs
 chmod 700 /ceph/csedu-scratch/course/IMC030_MLIP/users/"$USER" # only you can access
 ln -sfn /ceph/csedu-scratch/course/IMC030_MLIP/users/"$USER"/logs "$SCRIPT_DIR"/../logs
 
+mkdir -p /scratch/"$USER"/asr/data/trials
+chmod 700 /scratch/"$USER"/asr/data/trials # only you can access
+ln -sfn /scratch/"$USER"/asr/data/trials "$SCRIPT_DIR"/../trials
+
 
 # make sure that there's also a virtual environment
 # on the GPU nodes

@@ -93,9 +93,6 @@ class SpeakerChangeStats():
         self.total = SumMetric()  # number of total computed by wer
         self.samples = SumMetric()  # number of samples
 
-        self.stats = [self.i, self.d, self.s, self.c, self.fp, self.fn,
-                      self.spch, self.word, self.error, self.total,  self.samples]
-
         if prefix is None:
             self.prefix = ""
         else:

@@ -9,12 +9,12 @@ sys.path.append('src')
 
 class PreProcessor():
     def __call__(self, waveform):
-        raise NotImplementedError()
+        raise NotImplementedError("Call to abstract class")
 
 
 class PostProcessor():
     def __call__(self, transcription: List[str]):
-        raise NotImplementedError()
+        raise NotImplementedError("Call to abstract class")
 
 
 class StripSpeakerChange(PostProcessor):
@@ -24,3 +24,9 @@ class StripSpeakerChange(PostProcessor):
             transcription[i] = re.sub(r'\s+', ' ', trans.strip())
         return transcription
 
+
+class RemoveSpeakerChange(PostProcessor):
+    def __call__(self, transcription: List[str]):
+        for i, trans in enumerate(transcription):
+            transcription[i] = re.sub(r'#+', '', trans.strip())
+        return transcription

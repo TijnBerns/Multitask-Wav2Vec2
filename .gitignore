@@ -13,6 +13,8 @@ lightning_logs
 /lightning_logs
 stash
 /stash
+trials
+/trials
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

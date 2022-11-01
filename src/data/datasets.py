@@ -2,111 +2,131 @@
 from pickle import TRUE
 import torch
 from pathlib import Path
+from torch.functional import Tensor
 import torchaudio
 from config import Config
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader, RandomSampler, SequentialSampler
+from torch.utils.data._utils.collate import default_collate
 import itertools
 from typing import Union, List
 import pandas as pd
+import torchdata.datapipes as dp
 
 
-class CustomLibriSpeechDataset(Dataset):
-    def __init__(self, trans_file: Union[list, str]) -> None:
-        super().__init__()
-
-        if type(trans_file) == str:
-            self.trans_file = [trans_file]
-        elif type(trans_file) == list:
-            self.trans_file = trans_file
-        else:
-            raise ValueError(
-                f"Exptected trans_file to be of type None or str but got {type(trans_file)}.")
-
-        self.samples: List[LirbriSpeechItem] = self._load_samples()
-
-    def _load_transcriptions(self):
-        transcriptions = pd.concat((pd.read_csv(f) for f in self.trans_file))
-        transcriptions.drop_duplicates()
-        return transcriptions
-
-    def _load_samples(self):
-        transcriptions = self._load_transcriptions()
-        samples = [0] * len(transcriptions)
-        for i, sample in enumerate(transcriptions.iterrows()):
-            sample = sample[1]
-            samples[i] = LirbriSpeechItem(file_name=sample["path"],
-                                          transcription=sample["transcription"],
-                                          speaker_id=sample["speaker_id"],
-                                          book_id=sample["book_id"],
-                                          utterance_id=sample["utterance_id"])
-        return samples
-
-    def __len__(self):
-        return len(self.samples)
-
-    def __getitem__(self, idx):
-        return self.samples[idx].load_sample()
+########################################################################################
+# Librispeech items and batches
 
 
 class LirbriSpeechItem(object):
-    def __init__(self, file_name: Path, transcription: str, speaker_id: str, book_id: str, utterance_id: str):
-        self.file_name = file_name
-        self.transcription = transcription
-        self.speaker_id = speaker_id
-        self.book_id = book_id
-        self.utterance_id = utterance_id
+    def __init__(self, file_name: Union[str, Path], transcription: str, speaker_id: str, book_id: str, utterance_id: str):
+        self.file_name: Union[str, Path] = file_name
+        self.waveform: torch.Tensor = None
+        self.sample_rate = None
+        self.transcription: str = transcription
+
+        self.key: str = f"ls/{speaker_id}/{book_id}/{utterance_id}"
+        self.speaker_id: str = speaker_id
+        self.book_id: str = book_id
+        self.utterance_id: str = utterance_id
+
+        self.load_sample()
 
     def load_sample(self):
-        waveform, sample_rate = torchaudio.load(self.file_name)
-        return (waveform, sample_rate, self.transcription, self.speaker_id, self.book_id, self.utterance_id, self.file_name)
+        self.waveform, self.sample_rate = torchaudio.load(self.file_name)
+        return self.waveform
+
+    def __len__(self):
+        return self.waveform.shape[-1]
+
+    def __lt__(self, other):
+        return len(self) < len(other)
 
 
-class CustomLoader(object):
-    def __init__(self, dataset: Dataset, max_tokens: int, drop_last: bool, shuffle: bool, collate_fn):
-        self.ds = dataset
-        self.max_tokens = max_tokens
-        self.drop_last = drop_last
-        if shuffle:
-            self.sampler = RandomSampler(dataset)
-        else:
-            self.sampler = SequentialSampler(dataset)
-        self.collate_fn = collate_fn
+class LirbriSpeechBatch(object):
+    def __init__(self,
+                 waveforms: torch.Tensor = [],
+                 transcriptions: List[str] = [],
+                 speaker_ids: List[str] = [],
+                 book_ids: List[str] = [],
+                 utterance_ids: List[str] = [],
+                 keys: List[str] = [],
+                 sample_paths: List[str] = []) -> None:
+        self.waveforms = waveforms
+        self.transcriptions = transcriptions
+        self.speaker_ids = speaker_ids
+        self.book_ids = book_ids
+        self.utterance_ids = utterance_ids
+        self.keys = keys
+        self.sample_paths = sample_paths
 
-    def __iter__(self):
-        batch = []
-        added_tokens = 0
-        for idx in self.sampler:
-            num_tokens = self.ds[idx][0].size()[-1]
-            if added_tokens + num_tokens > self.max_tokens:
-                yield self.collate_fn(batch)
-                added_tokens = 0
-                batch = [self.ds[idx]]
-            else:
-                batch.append(self.ds[idx])
-                added_tokens += num_tokens
-
-        if len(batch) > 0 and not self.drop_last:
-            yield self.collate_fn(batch)
+    def to(self, device):
+        return LirbriSpeechBatch(
+            self.waveforms.to(device),
+            self.transcriptions,
+            self.speaker_ids,
+            self.book_ids,
+            self.utterance_ids,
+            self.keys,
+            self.sample_paths
+        )
 
 
-def initialize_loader(dataset, shuffle: bool):
+def row_processor(row: str):
+    return LirbriSpeechItem(file_name=row[0], speaker_id=row[1], book_id=row[2], utterance_id=row[3], transcription=row[4])
+
+
+def pad_collate(batch: Union[List[LirbriSpeechItem], LirbriSpeechItem]):
+    if isinstance(batch, LirbriSpeechItem):
+        batch = [batch]
+        
+    return LirbriSpeechBatch(
+        waveforms=pad_sequence(
+            [sample.waveform.squeeze() for sample in batch], batch_first=True, padding_value=0),
+        transcriptions=default_collate(
+            [sample.transcription for sample in batch]),
+        speaker_ids=default_collate([sample.speaker_id for sample in batch]),
+        book_ids=default_collate([sample.book_id for sample in batch]),
+        utterance_ids=default_collate(
+            [sample.utterance_id for sample in batch]),
+        keys=default_collate([sample.key for sample in batch]),
+        sample_paths=default_collate([sample.file_name for sample in batch])
+    )
+
+
+def build_datapipe(trans_file: str, dynamic_batch_size: bool=False):
+    datapipe: dp.iter.IterDataPipe = dp.iter.FileLister(trans_file)
+    datapipe = datapipe.open_files(mode='rt')
+    datapipe = datapipe.parse_csv(delimiter=",", skip_lines=1)
+    datapipe = datapipe.shuffle()
+    datapipe = datapipe.sharding_filter()
+    datapipe = datapipe.map(row_processor)
+    if dynamic_batch_size:
+        datapipe = datapipe.max_token_bucketize(max_token_count=Config.max_token_count,
+                                                include_padding=True)
+    datapipe = datapipe.collate(collate_fn=pad_collate)
+    return datapipe
+
+
+def check_batch_format(batch: List[any]):
+    if len(batch) != 1:
+        raise ValueError(f"Unexpted batch shape: got {batch}")
+    return batch[0]
+
+
+def initialize_loader(datapipe: dp.iter.IterDataPipe, shuffle: bool):
     dataloader = DataLoader(
-        dataset,
+        dataset=datapipe,
         num_workers=Config.num_workers,
         shuffle=shuffle,
         drop_last=False,
-        collate_fn=_pad_collate,
+        collate_fn=check_batch_format,
     )
     return dataloader
 
 
-def _pad_collate(batch):
-    xx, sample_rate, yy, id1, id2, id3, sp = zip(*batch)
-    xx = [x.flatten() for x in xx]
-    xx_pad = pad_sequence(xx, batch_first=True, padding_value=0)
-    return {"waveform": xx_pad, "transcription": list(yy), "id1": id1, "id2": id2, "id3": id3, "sample_path": sp}
-
+########################################################################################
+# Utility methods LibriSpeech dataset and loader
 
 def split_dataset(dataset, percentage: float):
     assert percentage > 0 and percentage < 1, "Unvalid percentage provided"
@@ -142,3 +162,41 @@ clean_datasets = {"train-clean-100": train_set,
                   "dev-clean": torchaudio.datasets.LIBRISPEECH(root=Config.datapath, url="dev-clean"),
                   "test-clean": torchaudio.datasets.LIBRISPEECH(root=Config.datapath, url="test-clean"),
                   }
+
+# @
+# class CustomLibriSpeechDataset(Dataset):
+#     def __init__(self, trans_file: Union[list, str]) -> None:
+#         super().__init__()
+
+#         if type(trans_file) == str:
+#             self.trans_file = [trans_file]
+#         elif type(trans_file) == list:
+#             self.trans_file = trans_file
+#         else:
+#             raise ValueError(
+#                 f"Exptected trans_file to be of type None or str but got {type(trans_file)}.")
+
+#         self.samples: List[LirbriSpeechItem] = self._load_samples()
+
+#     def _load_transcriptions(self):
+#         transcriptions = pd.concat((pd.read_csv(f) for f in self.trans_file))
+#         transcriptions.drop_duplicates()
+#         return transcriptions
+
+#     def _load_samples(self):
+#         transcriptions = self._load_transcriptions()
+#         samples = [0] * len(transcriptions)
+#         for i, sample in enumerate(transcriptions.iterrows()):
+#             sample = sample[1]
+#             samples[i] = LirbriSpeechItem(file_name=sample["path"],
+#                                           transcription=sample["transcription"],
+#                                           speaker_id=sample["speaker_id"],
+#                                           book_id=sample["book_id"],
+#                                           utterance_id=sample["utterance_id"])
+#         return samples
+
+#     def __len__(self):
+#         return len(self.samples)
+
+#     def __getitem__(self, idx):
+#         return self.samples[idx]
