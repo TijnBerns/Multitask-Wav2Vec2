@@ -88,8 +88,8 @@ def eval_asr(
                 samples=wav2vec2_module.embeddings,
                 skip_eer=True,
                 length_normalize=True,
-                mean_embedding=wav2vec2_module.mean_embedding,
-                std_embedding=wav2vec2_module.std_embedding
+                # mean_embedding=wav2vec2_module.mean_embedding,
+                # std_embedding=wav2vec2_module.std_embedding
             )
 
             # Compute EER based on predicted scores and ground truth labels

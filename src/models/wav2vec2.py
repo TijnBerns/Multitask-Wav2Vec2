@@ -19,7 +19,7 @@ from data.datasets import LirbriSpeechBatch
 from evaluation.evaluator import EmbeddingSample
 
 
-def load_processor(vocab_path: str) -> Wav2Vec2Processor:
+def load_processor(vocab_path: str) -> Tuple[Wav2Vec2Processor, int]:
     tokenizer = Wav2Vec2CTCTokenizer(
         vocab_path, unk_token="<unk>", pad_token="<pad>", word_delimiter_token="|")
     feature_extractor = Wav2Vec2FeatureExtractor(
@@ -33,7 +33,7 @@ def load_processor(vocab_path: str) -> Wav2Vec2Processor:
 
 def load_model(vocab_size: int) -> Wav2Vec2ForCTC:
     model = Wav2Vec2ForCTC.from_pretrained(
-        "facebook/wav2vec2-base-960h", ctc_loss_reduction="mean")
+        "facebook/wav2vec2-base", ctc_loss_reduction="mean")
     model.config.vocab_size = vocab_size
     model.lm_head = torch.nn.Linear(in_features=768, out_features=vocab_size)
     model.freeze_feature_encoder()
@@ -87,10 +87,10 @@ class Wav2Vec2Module(pl.LightningModule):
     def forward(self, batch: LirbriSpeechBatch, **kwargs) -> CausalLMOutput:
         waveforms = batch.waveforms
         transcriptions = batch.transcriptions
-
+        # attention_mask = torch.tensor(waveforms != 0, dtype=torch.long)
+        
         # Retrieve input values
-        input_values = self.processor(
-            waveforms, sampling_rate=16_000, return_tensors="pt", padding="longest").input_values
+        input_values = self.processor(waveforms, sampling_rate=16_000, return_tensors="pt", padding="longest").input_values
         input_values = torch.reshape(
             input_values, (len(waveforms), -1)).to(self.device)
 
