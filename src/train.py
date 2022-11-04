@@ -52,6 +52,8 @@ def main(train_trans: Union[List[str], str, None], val_trans: Union[List[str], s
                                                      batch_size=Config.batch_size,
                                                      stage=1,
                                                      vocab_path=vocab_path)
+    
+
     wav2vec2_module = wav2vec2_module.to(device)
 
     # First stage

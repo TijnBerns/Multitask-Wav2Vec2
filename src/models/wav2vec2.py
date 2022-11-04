@@ -60,7 +60,7 @@ class Wav2Vec2Module(pl.LightningModule):
 
         # Speaker embeddings
         self.save_embeddings: bool = self.vocab_size > 32
-        self.embeddings: List[EmbeddingSample] = []
+        self.embeddings: List[List[EmbeddingSample]] = [[] for _ in range(13)]
         self.kernel_size: int = kernel_size
         self.embeddings_queue = deque(maxlen=3000)
         # self.mean_embedding = torch.nn.parameter.Parameter(
@@ -153,11 +153,12 @@ class Wav2Vec2Module(pl.LightningModule):
 
             # TODO: FOR NOW ONLY ADD THE FIRST EMBEDDING FOUND
             if len(speaker_embeddings) == 0:
-                raise ValueError("Speaker embedding cannot be None")
+                raise ValueError("Speaker embedding cannot be None")      
             
-            self.embeddings.append(EmbeddingSample(
-                sample_id=batch.keys[i], embedding=speaker_embeddings[0]))
-            self.embeddings_queue.append(speaker_embeddings[0])
+            for j, embedding in enumerate(speaker_embeddings):
+                self.embeddings[j].append(EmbeddingSample(batch.keys[i], embedding))
+                
+            self.embeddings_queue.append(speaker_embeddings[-1])
 
         return output.loss
 
@@ -305,7 +306,7 @@ class Wav2Vec2Module(pl.LightningModule):
                                   torch.zeros(hidden_states[-1].shape[0], dtype=torch.long))
 
         # Save the found speaker embeddings
-        return hidden_states[-1][speaker_change_idx].to('cpu')
+        return [hidden_states[i][speaker_change_idx][0].to('cpu') for i in range(len(hidden_states))]
 
     def _add_batch_to_embedding_queue(self, embedding: torch.Tensor):
         # make sure to keep it into CPU memory
