@@ -1,6 +1,6 @@
 from config import Config
 import re
-from typing import List
+from typing import List, Union
 from dataclasses import dataclass
 import torch
 import sys
@@ -18,15 +18,17 @@ class PostProcessor():
 
 
 class StripSpeakerChange(PostProcessor):
-    def __call__(self, transcription: List[str]):
-        for i, trans in enumerate(transcription):
+    def __call__(self, transcription: List[str]) -> List[str]:
+        res = []
+        for trans in transcription:
             trans = trans.replace('#', ' # ')
-            transcription[i] = re.sub(r'\s+', ' ', trans.strip())
-        return transcription
+            res.append(re.sub(r'\s+', ' ', trans.strip()))
+        return res
 
 
 class RemoveSpeakerChange(PostProcessor):
-    def __call__(self, transcription: List[str]):
-        for i, trans in enumerate(transcription):
-            transcription[i] = re.sub(r'#+', '', trans.strip())
-        return transcription
+    def __call__(self, transcription: List[str]) -> List[str]:
+        res = []
+        for trans in transcription:
+            res.append(re.sub(r'#+', '', trans.strip()))
+        return res

@@ -7,6 +7,7 @@ import numpy as np
 from config import Config
 from jiwer import wer as jiwer_wer
 from pyllr.pav_rocch import PAV, ROCCH
+from models.processor import RemoveSpeakerChange
 
 ################################################################################
 # helper methods for both measures
@@ -97,6 +98,8 @@ class SpeakerChangeStats():
             self.prefix = ""
         else:
             self.prefix = f"{prefix}_"
+            
+        self.processor = RemoveSpeakerChange()
 
     def __call__(self, preds: Union[str, List[str]], target: Union[str, List[str]]) -> None:
         self._update_stats(preds, target)
@@ -139,19 +142,24 @@ class SpeakerChangeStats():
         fn += d
         fp += i
 
+
         return c, i, d, s, fn, fp
 
-    def _update_stats(self, preds: Union[str, List[str]], target: Union[str, List[str]]) -> None:
-        if isinstance(preds, str):
-            preds = [preds]
-        if isinstance(target, str):
-            target = [target]
+    def _update_stats(self, predictions: Union[str, List[str]], targets: Union[str, List[str]]) -> None:
+        if isinstance(predictions, str):
+            predictions = [predictions]
+        if isinstance(targets, str):
+            targets = [targets]
+            
+        predictions_no_spch = self.processor(predictions)
+        targets_no_spch = self.processor(targets)
 
-        for prd, tgt in zip(preds, target):
+        for prd, prd_no_spch, tgt, targets_no_spch in zip(predictions, predictions_no_spch, targets, targets_no_spch):
             # Compute operation counts
-            tgt, prd = tgt.split(), prd.split()
-            wer = WER(tgt, prd)
-            c, i, d, s, fn, fp = self._operation_counts(wer.pralign())
+            prd, prd_no_spch = prd.split(), prd_no_spch.split()
+            tgt, targets_no_spch = tgt.split(), targets_no_spch.split()
+            
+            c, i, d, s, fn, fp = self._operation_counts(WER(tgt, prd).pralign())
 
             # Update stats
             self.i.update(i)
@@ -162,10 +170,10 @@ class SpeakerChangeStats():
             self.fp.update(fp)
             self.fn.update(fn)
             self.spch.update(s + d + c)
-            self.word.update(len(tgt) - s - d - c)
+            self.word.update(len(targets_no_spch))
 
-            self.error.update(wer.nerr)
-            self.total.update(len(tgt))
+            self.error.update(WER(targets_no_spch, prd_no_spch).nerr)
+            self.total.update(len(targets_no_spch))
             self.samples.update(1)
         return
 

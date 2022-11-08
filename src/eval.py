@@ -9,20 +9,20 @@ import models.wav2vec2
 import pytorch_lightning as pl
 from typing import Optional
 from evaluation.evaluator import SpeakerTrial, SpeakerRecognitionEvaluator
-from evaluation.metrics import calculate_eer
 from tqdm import tqdm
 from pprint import pprint
 
 
 def get_datasets(trans_file: str):
     datasets = {
-        # "dev-full": data.CustomLibriSpeechDataset([
+        # "dev-mini": data.build_datapipe(Config.datapath + f'/dev-clean-no-rep/dev-mini.csv'),
+        # "train-mini": data.build_datapipe(Config.datapath + f'/train-clean-100-no-rep/mini.csv'),
+        # "dev-full": data.build_datapipe((
         #     Config.datapath + f'/dev-clean-no-rep/{trans_file}',
-        #     Config.datapath + f'/dev-clean-rep/{trans_file}']),
-        # "dev-no-rep": data.CustomLibriSpeechDataset([
-        #     Config.datapath + f'/dev-clean-no-rep/{trans_file}']),
-        # "dev-rep": data.CustomLibriSpeechDataset([
-        #     Config.datapath + f'/dev-clean-rep/{trans_file}']),
+        #     Config.datapath + f'/dev-clean-rep/{trans_file}'
+        # )),
+        "dev-no-rep": data.build_datapipe(Config.datapath + f'/dev-clean-no-rep/{trans_file}'),
+        "dev-rep": data.build_datapipe(Config.datapath + f'/dev-clean-rep/{trans_file}'),
         "dev-clean": data.build_datapipe(Config.datapath + f'/LibriSpeech/dev-clean.{trans_file}'),
         # "test-full": data.CustomLibriSpeechDataset([
         #     Config.datapath + f'/test-clean-no-rep/{trans_file}',
@@ -56,33 +56,22 @@ def load_module(checkpoint_path: Optional[str], vocab_path: Optional[str]):
 def eval_spid(trials, wav2vec2_module):
     # For each trial, compute scores based on cosine similarity
     eer_list = []
-    for i, embedding_list in enumerate(wav2vec2_module.embeddings):
-        print(f"Computing scores...")
-        scores = SpeakerRecognitionEvaluator.evaluate(
-            pairs=trials,
-            samples=embedding_list,
-            skip_eer=True,
-            length_normalize=True,
-            # mean_embedding=wav2vec2_module.mean_embedding,
-            # std_embedding=wav2vec2_module.std_embedding
-        )
+    # for i, embedding_list in enumerate(wav2vec2_module.embeddings):
+    # embedding_list = wav2vec2_module.embeddings[i]
+    embedding_list = wav2vec2_module.embeddings
+    i = 12
 
-        # Compute EER based on predicted scores and ground truth labels
-        eer_scores = list()
-        eer_labels = list()
-        for score, pair in tqdm(zip(scores, trials), desc='Computing EER...'):
-            if pair.same_speaker is not None:
-                eer_scores.append(score)
-                eer_labels.append(pair.same_speaker)
-
-        if len(eer_scores) > 0:
-            eer = calculate_eer(
-                groundtruth_scores=eer_labels, predicted_scores=eer_scores)
-        else:
-            eer = -1
-        
-        print(f'computed eer for layer {i}:\t {100 * eer:4.2f}%')
-        eer_list.append(eer * 100)
+    print(f"Computing scores...")
+    eer = SpeakerRecognitionEvaluator.evaluate(
+        pairs=trials,
+        samples=embedding_list,
+        skip_eer=False,
+        length_normalize=True,
+        # mean_embedding=wav2vec2_module.mean_embedding,
+        # std_embedding=wav2vec2_module.std_embedding
+    )
+    print(f'computed eer for layer {i}:\t {100 * eer}%')
+    eer_list.append(eer)
 
     return eer_list
 
@@ -133,7 +122,7 @@ def eval_asr(
         utils.write_dict_list(path=Path(
             "logs") / "preds" / f"{ckpt_version:0>7}-{prefix}-{dataset_str}-{trans_file[:-4]}-preds.csv",
             data=wav2vec2_module.test_preds)
-        
+
         # Reset the saved embeddings and predictions
         wav2vec2_module.reset_saves()
 
@@ -143,7 +132,7 @@ def eval_asr(
               default=None,
               help="Version number of which the model is evaluated.")
 @click.option("--trans_file",
-              default='trans.csv',
+              default='trans-st.csv',
               help="Name of transcription file on which model is evaluated (not the complete path).")
 @click.option("--vocab_file",
               default="vocab_spid.json",

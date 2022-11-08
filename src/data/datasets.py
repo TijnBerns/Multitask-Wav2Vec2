@@ -70,6 +70,9 @@ class LirbriSpeechBatch(object):
             self.keys,
             self.sample_paths
         )
+        
+    def __len__(self):
+        return len(self.keys)
 
 
 def row_processor(row: str):
@@ -94,7 +97,7 @@ def pad_collate(batch: Union[List[LirbriSpeechItem], LirbriSpeechItem]):
     )
 
 
-def build_datapipe(trans_file: str, dynamic_batch_size: bool=False):
+def build_datapipe(trans_file: Union[str, List[str]], dynamic_batch_size: bool=False):
     datapipe: dp.iter.IterDataPipe = dp.iter.FileLister(trans_file)
     datapipe = datapipe.open_files(mode='rt')
     datapipe = datapipe.parse_csv(delimiter=",", skip_lines=1)

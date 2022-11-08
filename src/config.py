@@ -23,7 +23,7 @@ class Config():
     lr_stage_one: float = 1e-3
     lr_stage_two: float = 1e-4
     num_steps_stage_one: int = 0 // effective_batch_size
-    num_steps_stage_two: int = 320_000 // effective_batch_size
+    num_steps_stage_two: int = 100_000 // effective_batch_size
     # num_epochs = 20
     # num_epochs_stage_one = 0
     # num_epochs_stage_two = num_epochs - num_epochs_stage_one

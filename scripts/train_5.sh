@@ -12,6 +12,8 @@ project_dir=.
 # Train on train-clean-full with speaker ids instead of speaker change symbols
 source "$project_dir"/venv/bin/activate
 python "$project_dir"/src/train.py \
-    --train_trans=trans-id.csv \
-    --val_trans=trans-st.csv \
-    --vocab_path=/home/tberns/Speaker_Change_Recognition/src/models/vocab_spid.json
+    --vocab_path=src/models/vocab_spid.json \
+    --train_trans=/scratch/tberns/asr/data/train-clean-100-no-rep/trans-id.csv \
+    --train_trans=/scratch/tberns/asr/data/train-clean-100-rep/trans-id.csv \
+    --val_trans=/scratch/tberns/asr/data/val-clean-no-rep/trans-st.csv \
+    --val_trans=/scratch/tberns/asr/data/val-clean-rep/trans-st.csv

@@ -124,24 +124,22 @@ class SpeakerRecognitionEvaluator:
             
 
         # compute a list of ground truth scores and prediction scores
-        ground_truth_scores = []
+        ground_truth_scores_a = []
         prediction_pairs = []
+        ground_truth_scores_b = []
 
-        for pair in tqdm(pairs, desc='Evaluating speaker pairs'):
-            if pair.left not in sample_map or pair.right not in sample_map:
-                warn(f"{pair.left} or {pair.right} not in sample_map")
-                return {
-                    "eer": -1,
-                }
-
-            s1 = sample_map[pair.left]
-            s2 = sample_map[pair.right]
-
+        for pair in tqdm(pairs):
             gt = 1 if pair.same_speaker else 0
+            if pair.left in sample_map and pair.right in sample_map:
+                
+                s1 = sample_map[pair.left]
+                s2 = sample_map[pair.right]
 
-            ground_truth_scores.append(gt)
-            prediction_pairs.append((s1, s2))
-
+                ground_truth_scores_a.append(gt)
+                prediction_pairs.append((s1, s2))
+            else:
+                ground_truth_scores_b.append(gt)
+  
         if cohort is not None:
             prediction_scores = cls._compute_asnorm_prediction_scores(
                 prediction_pairs,
@@ -159,12 +157,15 @@ class SpeakerRecognitionEvaluator:
             )
 
         # normalize scores to be between 0 and 1
-        prediction_scores = np.clip(
-            (np.array(prediction_scores) + 1) / 2, 0, 1)
-        prediction_scores = prediction_scores.tolist()
+        # ground_truth_scores = ground_truth_scores_a + ground_truth_scores_b
+        # prediction_scores: np.ndarray = np.clip((np.array(prediction_scores) + 1) / 2, 0, 1)
+        # prediction_scores = np.append(prediction_scores, np.zeros_like(ground_truth_scores_b)).tolist()
+        
+        ground_truth_scores = ground_truth_scores_a
+        prediction_scores: np.ndarray = np.clip((np.array(prediction_scores) + 1) / 2, 0, 1).tolist()
 
         if skip_eer:
-            return prediction_scores
+            return ground_truth_scores, prediction_scores
 
         # compute EER
         try:
@@ -174,10 +175,9 @@ class SpeakerRecognitionEvaluator:
             # so that programs relying on result don't crash
             print(f"EER calculation had {e}")
             eer = 1
-
-        return {
-            "eer": eer,
-        }
+            
+        return eer
+        
 
     @classmethod
     def _compute_asnorm_prediction_scores(
