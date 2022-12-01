@@ -17,6 +17,7 @@ pydub
 click
 pytorch_lightning
 torchmetrics
+scikit-learn
 
 git+https://github.com/davidavdav/WordErrorRate.py.git
 git+https://github.com/bsxfan/PYLLR.git

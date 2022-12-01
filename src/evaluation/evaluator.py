@@ -7,8 +7,9 @@
 ################################################################################
 
 from dataclasses import dataclass
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, Any
 from warnings import warn
+from sklearn.cluster import OPTICS
 
 import numpy as np
 import torch as t
@@ -29,7 +30,16 @@ from pathlib import Path
 @dataclass
 class EmbeddingSample:
     sample_id: str
-    embedding: t.Tensor
+    embedding: np.array
+    index: int = 0   
+    
+    
+class EmbeddingClustering:    
+    @classmethod
+    def cluster(cls, embeddings: List[EmbeddingSample]):
+        np_embeddings = np.array(list(map(lambda x: x.embedding, embeddings)))
+        clustering = OPTICS(min_samples=5).fit(np_embeddings)
+        
 
 
 ########################################################################################

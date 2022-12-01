@@ -8,7 +8,7 @@ import models.wav2vec2
 
 import pytorch_lightning as pl
 from typing import Optional
-from evaluation.evaluator import SpeakerTrial, SpeakerRecognitionEvaluator
+from evaluation.evaluator import SpeakerTrial, SpeakerRecognitionEvaluator, EmbeddingClustering
 from tqdm import tqdm
 from pprint import pprint
 
@@ -27,12 +27,9 @@ def get_datasets(trans_file: str):
         # "test-full": data.CustomLibriSpeechDataset([
         #     Config.datapath + f'/test-clean-no-rep/{trans_file}',
         #     Config.datapath + f'/test-clean-rep/{trans_file}']),
-        # "test-no-rep": data.CustomLibriSpeechDataset([
-        #     Config.datapath + f'/test-clean-no-rep/{trans_file}']),
-        # "test-rep": data.CustomLibriSpeechDataset([
-        #     Config.datapath + f'/test-clean-rep/{trans_file}']),
-        # "test-clean": data.CustomLibriSpeechDataset([
-        #     Config.datapath + f'/LibriSpeech/test-clean.{trans_file}']),
+        "test-no-rep": data.build_datapipe(Config.datapath + f'/test-clean-no-rep/{trans_file}'),
+        "test-rep": data.build_datapipe(Config.datapath + f'/test-clean-rep/{trans_file}'),
+        "test-clean": data.build_datapipe(Config.datapath + f'/LibriSpeech/test-clean.{trans_file}'),
         # "train-no-rep": data.CustomLibriSpeechDataset([
         #     Config.datapath + f'/train-clean-100-no-rep/{trans_file}']),
     }
@@ -93,7 +90,9 @@ def eval_asr(
     wav2vec2_module = wav2vec2_module.to(device)
 
     all_res = []
-    for dataset_str, dataset in datasets.items():
+    for dataset_str, dataset in datasets.items(): 
+        wav2vec2_module.dataset_type = dataset_str.split('-')[0] # "dev or test"
+        
         # Initialize dataloader
         loader = data.initialize_loader(dataset, shuffle=False)
 
@@ -103,9 +102,10 @@ def eval_asr(
         res = trainer.test(model=wav2vec2_module, dataloaders=loader)[0]
 
         # Evaluate speaker identification
-        if len(wav2vec2_module.embeddings) > 0:
-            trials = SpeakerTrial.from_file(
-                Path('/home/tberns/Speaker_Change_Recognition/trials/dev-clean.trials.txt'))
+        print(f"embeddings: {len(wav2vec2_module.embeddings)}")
+        if len(wav2vec2_module.embeddings) > 0 and (dataset_str != ""):
+            # EmbeddingClustering.cluster(wav2vec2_module.embeddings)
+            trials = SpeakerTrial.from_file(Path('/home/tberns/Speaker_Change_Recognition/trials/dev-clean.trials.txt'))
             eer = eval_spid(trials, wav2vec2_module)
             res["EER"] = eer
 
@@ -118,7 +118,7 @@ def eval_asr(
         # Write results to out files
         pprint(res)
         utils.json_dump(path=Path("logs") / "measures" /
-                        f"{ckpt_version:0>7}-{trans_file[:-4]}-res.json", data=all_res)
+                        f"{ckpt_version:0>7}-{prefix}-{trans_file[:-4]}-res.json", data=all_res)
         utils.write_dict_list(path=Path(
             "logs") / "preds" / f"{ckpt_version:0>7}-{prefix}-{dataset_str}-{trans_file[:-4]}-preds.csv",
             data=wav2vec2_module.test_preds)
@@ -141,7 +141,7 @@ def eval_all(
     version_number: str,
     trans_file: str,
     vocab_file: str
-):
+):  
     vocab_path = f"src/models/{vocab_file}"
     if version_number is None:
         print(f"Evaluating base model")
@@ -150,14 +150,12 @@ def eval_all(
 
     checkpoints = Path(
         f"lightning_logs/version_{version_number}").rglob("*.ckpt")
-
+            
     for checkpoint_path in checkpoints:
-        # if ".last" in str(checkpoint_path):
-        #     continue
-
         print(f"Evaluating {checkpoint_path}")
         eval_asr(trans_file, vocab_path, checkpoint_path)
 
 
 if __name__ == "__main__":
+    pl.seed_everything(Config.seed)
     eval_all()

@@ -19,7 +19,7 @@ import click
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 
-from evaluation.evaluator import SpeakerTrial
+from src.evaluation.evaluator import SpeakerTrial
 from data.datasets import CustomLibriSpeechDataset, LirbriSpeechItem
 
 

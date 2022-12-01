@@ -19,6 +19,7 @@ from models.processor import StripSpeakerChange, PostProcessor
 from models.tri_stage import TriStageLearningRateLambdaLRFunction as TriStageLR
 from data.datasets import LirbriSpeechBatch
 from evaluation.evaluator import EmbeddingSample
+import numpy as np
 
 
 def load_processor(vocab_path: str) -> Tuple[Wav2Vec2Processor, int]:
@@ -52,7 +53,8 @@ class Wav2Vec2Module(pl.LightningModule):
                  lr_stage_two: float = Config.lr_stage_two,
                  batch_size: int = Config.batch_size,
                  kernel_size: int = 10,
-                 postprocessor: PostProcessor = StripSpeakerChange()):
+                 postprocessor: PostProcessor = StripSpeakerChange(),
+                 dataset_type: str = 'dev'):
 
         super().__init__()
         self.processor, self.vocab_size = load_processor(vocab_path)
@@ -62,7 +64,7 @@ class Wav2Vec2Module(pl.LightningModule):
 
         # Speaker embeddings
         self.save_embeddings: bool = self.vocab_size > 32
-        self.embeddings: List[EmbeddingSample] = []
+        self.embeddings: List = list()
         self.kernel_size: int = kernel_size
         self.embeddings_queue = deque(maxlen=3000)
         # self.mean_embedding = torch.nn.parameter.Parameter(
@@ -75,8 +77,9 @@ class Wav2Vec2Module(pl.LightningModule):
         self.std_embedding = torch.zeros(768)
 
         # Metrics
+        self.dataset_type = dataset_type
         self.val_stats: SpeakerChangeStats = SpeakerChangeStats(prefix="val")
-        self.test_stats: SpeakerChangeStats = SpeakerChangeStats(prefix="dev")
+        self.test_stats: SpeakerChangeStats = SpeakerChangeStats(prefix=dataset_type)
         self.test_preds: List[Dict] = []
 
         # Training parameters
@@ -87,6 +90,7 @@ class Wav2Vec2Module(pl.LightningModule):
         self.batch_size: int = batch_size
 
         # temporary attributes
+        
         self.size_mismatch_count = 0
 
     def forward(self, batch: LirbriSpeechBatch, **kwargs) -> CausalLMOutput:

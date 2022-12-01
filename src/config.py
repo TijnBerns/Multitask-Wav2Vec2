@@ -21,9 +21,9 @@ class Config():
     
     # Training parameters
     lr_stage_one: float = 1e-3
-    lr_stage_two: float = 1e-4
-    num_steps_stage_one: int = 0 // effective_batch_size
-    num_steps_stage_two: int = 100_000 // effective_batch_size
+    lr_stage_two: float = 3e-5
+    num_steps_stage_one: int = 0
+    num_steps_stage_two: int = 100_000
     # num_epochs = 20
     # num_epochs_stage_one = 0
     # num_epochs_stage_two = num_epochs - num_epochs_stage_one
@@ -36,7 +36,4 @@ class Config():
     max_tokens: int = int(sample_rate * 30)
     max_attempts: int = 100
     train_split: float = 0.8
-    
-    
-    
     
