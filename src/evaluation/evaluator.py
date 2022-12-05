@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple, Union, Any
 from warnings import warn
 from sklearn.cluster import OPTICS
+import json
+
 
 import numpy as np
 import torch as t
@@ -31,8 +33,15 @@ from pathlib import Path
 class EmbeddingSample:
     sample_id: str
     embedding: np.array
-    index: int = 0   
     
+    def __eq__(self, __o: object) -> bool:
+        if isinstance(__o, EmbeddingSample):
+            return __o.sample_id == self.sample_id
+        return False
+    
+    def __hash__(self) -> int:
+        return hash(self.sample_id)
+        
     
 class EmbeddingClustering:    
     @classmethod
@@ -138,7 +147,7 @@ class SpeakerRecognitionEvaluator:
         prediction_pairs = []
         ground_truth_scores_b = []
 
-        for pair in tqdm(pairs):
+        for pair in pairs:
             gt = 1 if pair.same_speaker else 0
             if pair.left in sample_map and pair.right in sample_map:
                 

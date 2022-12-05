@@ -14,5 +14,5 @@ project_dir=.
 source "$project_dir"/venv/bin/activate
 python "$project_dir"/src/eval.py \
     --version_number=$1 \
-    --trans_file=$2 \
-    --vocab_file=$3
+    --trans_file=trans-st.csv \
+    --vocab_file=vocab_spid.json

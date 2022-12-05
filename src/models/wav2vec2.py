@@ -77,10 +77,7 @@ class Wav2Vec2Module(pl.LightningModule):
         self.std_embedding = torch.zeros(768)
 
         # Metrics
-        self.dataset_type = dataset_type
-        self.val_stats: SpeakerChangeStats = SpeakerChangeStats(prefix="val")
-        self.test_stats: SpeakerChangeStats = SpeakerChangeStats(prefix=dataset_type)
-        self.test_preds: List[Dict] = []
+        self.initMetrics(dataset_type)
 
         # Training parameters
         self.num_steps_stage_one: int = num_steps_stage_one
@@ -92,6 +89,12 @@ class Wav2Vec2Module(pl.LightningModule):
         # temporary attributes
         
         self.size_mismatch_count = 0
+        
+    def initMetrics(self, dataset_type):
+        self.val_stats: SpeakerChangeStats = SpeakerChangeStats(prefix="val")
+        self.test_stats: SpeakerChangeStats = SpeakerChangeStats(prefix=dataset_type)
+        self.test_preds: List[Dict] = []
+        
 
     def forward(self, batch: LirbriSpeechBatch, **kwargs) -> CausalLMOutput:
         waveforms = batch.waveforms
