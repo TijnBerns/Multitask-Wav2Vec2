@@ -64,7 +64,7 @@ class Wav2Vec2Module(pl.LightningModule):
 
         # Speaker embeddings
         self.save_embeddings: bool = self.vocab_size > 32
-        self.embeddings: List = list()
+        self.embeddings = defaultdict(list)
         self.kernel_size: int = kernel_size
         self.embeddings_queue = deque(maxlen=3000)
         # self.mean_embedding = torch.nn.parameter.Parameter(
@@ -162,38 +162,40 @@ class Wav2Vec2Module(pl.LightningModule):
 
         # Save speaker embedddings
         for i in range(len(batch)):
-            speaker_embeddings = self._extract_embeddings(
+            speaker_change_idx = self._extract_embeddings(
                 output.hidden_states, processed_logits[i])
 
             reconstruced_keys, embbeding_idx = utils.reconstruct_keys(
                 batch.keys[i])
-
-            if len(set(embbeding_idx)) != len(speaker_embeddings):
+            
+            if len(set(embbeding_idx)) != len(speaker_change_idx):
                 self.size_mismatch_count += 1
                 return output.loss
 
             # Add found embeddings and their corresponding keys to lists
-            for j in embbeding_idx:
-                self.embeddings.append(
-                    EmbeddingSample(reconstruced_keys[j], speaker_embeddings[j]))
+            for k, hidden_states in enumerate(output.hidden_states):
+                for j in embbeding_idx:
+                    embedding = hidden_states.squeeze()[speaker_change_idx][j].to('cpu')
+                    key = reconstruced_keys[j]
+                    self.embeddings[k].append(EmbeddingSample(key, embedding))
                 
-            self.embeddings_queue.extend(speaker_embeddings)
+            self.embeddings_queue.extend(speaker_change_idx)
 
         return output.loss
 
     def test_epoch_end(self, outputs: Any) -> None:
         self.log_dict(self.test_stats.compute_and_reset())
         # update the mean & std of test embeddings
-        if self.save_embeddings:
-            mean, std = self._compute_mean_std_batch(
-                [e for e in self.embeddings_queue])
+        # if self.save_embeddings:
+        #     mean, std = self._compute_mean_std_batch(
+        #         [e for e in self.embeddings_queue])
 
-            with torch.no_grad():
-                mean = mean.to(self.mean_embedding.device)
-                std = std.to(self.std_embedding.device)
+        #     with torch.no_grad():
+        #         mean = mean.to(self.mean_embedding.device)
+        #         std = std.to(self.std_embedding.device)
 
-                self.mean_embedding[:] = mean
-                self.std_embedding[:] = std
+        #         self.mean_embedding[:] = mean
+        #         self.std_embedding[:] = std
         print(self.size_mismatch_count)
         return
 
@@ -254,8 +256,8 @@ class Wav2Vec2Module(pl.LightningModule):
         return [optimizer], [schedule]
 
     def reset_saves(self):
-        self.embeddings = []
-        self.test_preds = []
+        self.embeddings = defaultdict(list)
+        self.test_preds = defaultdict(list) 
         return
 
     def _compute_mean_std_batch(self, all_tensors: List[torch.Tensor]):
@@ -304,7 +306,7 @@ class Wav2Vec2Module(pl.LightningModule):
             speaker_change_idx = torch.tensor([0])
 
         # Save the found speaker embeddings
-        return hidden_states[-1].squeeze()[speaker_change_idx].to('cpu')
+        return speaker_change_idx
 
     def _add_batch_to_embedding_queue(self, embedding: torch.Tensor):
         # make sure to keep it into CPU memory

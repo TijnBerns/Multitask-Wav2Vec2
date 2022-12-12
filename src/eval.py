@@ -11,6 +11,7 @@ from typing import Optional, List
 from evaluation.evaluator import SpeakerTrial, SpeakerRecognitionEvaluator, EmbeddingSample
 from data.datasets import LirbriSpeechItem, pad_collate
 from tqdm import tqdm
+from collections import defaultdict
 from pprint import pprint
 import pickle
 import torch
@@ -19,13 +20,17 @@ import torch
 def get_datasets(trans_file: str):
     datasets = [
         # Development sets
-        {"dev-no-rep": data.build_datapipe(Config.datapath + f'/dev-clean-no-rep/{trans_file}'),
-         "dev-rep": data.build_datapipe(Config.datapath + f'/dev-clean-rep/{trans_file}'),
-         "dev-clean": data.build_datapipe(Config.datapath + f'/LibriSpeech/dev-clean.{trans_file}')},
+        {
+            "dev-no-rep": data.build_datapipe(Config.datapath + f'/dev-clean-no-rep/{trans_file}'),
+            "dev-rep": data.build_datapipe(Config.datapath + f'/dev-clean-rep/{trans_file}'),
+            "dev-clean": data.build_datapipe(Config.datapath + f'/LibriSpeech/dev-clean.{trans_file}')
+        },
         # Test sets
-        {"test-no-rep": data.build_datapipe(Config.datapath + f'/test-clean-no-rep/{trans_file}'),
-         "test-rep": data.build_datapipe(Config.datapath + f'/test-clean-rep/{trans_file}'),
-         "test-clean": data.build_datapipe(Config.datapath + f'/LibriSpeech/test-clean.{trans_file}')}
+        {
+            "test-no-rep": data.build_datapipe(Config.datapath + f'/test-clean-no-rep/{trans_file}'),
+            "test-rep": data.build_datapipe(Config.datapath + f'/test-clean-rep/{trans_file}'),
+            "test-clean": data.build_datapipe(Config.datapath + f'/LibriSpeech/test-clean.{trans_file}')
+        }
     ]
     return datasets
 
@@ -49,36 +54,38 @@ def load_module(checkpoint_path: Optional[str], vocab_path: Optional[str]):
 
 def eval_spid(embedding_files: List[str], trials_path):
     trials = SpeakerTrial.from_file(trials_path)
-    eer_dict = {}
-    len_dict = {}
-
-    keys = []
-    for embedding_file in embedding_files:
-        embeddings = pickle.load(open(embedding_file, "rb"))
-        len_dict[embedding_file] = len(embeddings)
-        keys.append(set([embedding.sample_id for embedding in embeddings]))
+    eer_dict = defaultdict(list)
     
-    # Compute intersection of all keys
-    try:
-        keys_intersection = set.intersection(*keys)
-    except TypeError:
-        return eer_dict
-    
-    for embedding_file in embedding_files:
-        embeddings: List[EmbeddingSample] = pickle.load(
-            open(embedding_file, "rb"))
-        embeddings_filtered = list(filter(
-            lambda e: e.sample_id in keys_intersection, embeddings))
+    for hidden_state in range(12,13):
+        len_dict = {}
 
-        print(f'Computing EER for {embedding_file}...')
-        eer = SpeakerRecognitionEvaluator.evaluate(
-            pairs=trials,
-            samples=embeddings_filtered,
-            skip_eer=False,
-            length_normalize=True,)
-        print(f'EER:       {100 * eer:.2f}%\n' +
-              f'Emb. used: {len(embeddings_filtered)}/{len(embeddings)}\n')
-        eer_dict[embedding_file] = eer
+        keys = []
+        for embedding_file in embedding_files:
+            embeddings = pickle.load(open(embedding_file, "rb"))[hidden_state]
+            len_dict[embedding_file] = len(embeddings)
+            keys.append(set([embedding.sample_id for embedding in embeddings]))
+        
+        # Compute intersection of all keys
+        try:
+            keys_intersection = set.intersection(*keys)
+        except TypeError:
+            return eer_dict
+
+        for embedding_file in embedding_files:
+            embeddings: List[EmbeddingSample] = pickle.load(
+                open(embedding_file, "rb"))[hidden_state]
+            embeddings_filtered = list(filter(
+                lambda e: e.sample_id in keys_intersection, embeddings))
+
+            print(f'Computing EER for {embedding_file} ({len(embeddings_filtered)}/{len(embeddings)} embeddings)...')
+            eer = SpeakerRecognitionEvaluator.evaluate(
+                pairs=trials,
+                samples=embeddings_filtered,
+                skip_eer=False,
+                length_normalize=True,)
+            print(f'EER:       {100 * eer:.2f}%\n' +
+                f'Emb. used: {len(embeddings_filtered)}/{len(embeddings)}\n')
+            eer_dict[str(embedding_file)].append(100 * eer)
 
     return eer_dict
 
@@ -103,7 +110,6 @@ def eval_asr(
     save_string = f"{ckpt_version:0>7}-{prefix}.{trans_file[:-4]}"
     for dataset_str, dataset in datasets.items():
         wav2vec2_module.initMetrics(dataset_str.split('-')[0])
-        
 
         # Initialize dataloader
         loader = data.initialize_loader(dataset, shuffle=False)
@@ -115,7 +121,7 @@ def eval_asr(
 
         # Evaluate speaker identification
         print(f"embeddings: {len(wav2vec2_module.embeddings)}")
-        if len(wav2vec2_module.embeddings) > 0:
+        if len(wav2vec2_module.embeddings[0]) > 0:
             pickle.dump(wav2vec2_module.embeddings, open(
                 Path("logs") / "embeddings" / f"{save_string}.{dataset_str}.embeddings.p", "wb"))
 
@@ -126,7 +132,7 @@ def eval_asr(
         all_res.append(res)
 
         # Write results to out files
-        utils.json_dump(path=Path("logs") / "measures" / f"{save_string}-res.json",
+        utils.json_dump(path=Path("logs") / "measures" / f"{save_string}.res.json",
                         data=all_res)
         utils.write_dict_list(path=Path("logs") / "preds" / f"{save_string}.{dataset_str}.preds.csv",
                               data=wav2vec2_module.test_preds)
@@ -158,45 +164,49 @@ def eval_all(
 
     checkpoints = Path(
         f"lightning_logs/version_{version_number}").rglob("*best*.ckpt")
-    
+
     for checkpoint_path in checkpoints:
         eval_asr(trans_file, vocab_path, checkpoint_path)
 
     # Get paths to best embeddings
     dev_embedding_files = list(
-        Path(f"logs/embeddings").rglob(f"{version_number}-best-dev*"))
+        Path(f"logs/embeddings").rglob(f"{version_number}-best*dev*"))
     test_embedding_files = list(
-        Path(f"logs/embeddings").rglob(f"{version_number}-best-test*"))
+        Path(f"logs/embeddings").rglob(f"{version_number}-best*test*"))
 
     # Evaluate SPID for given version
-    eval_spid(embedding_files=dev_embedding_files,
-                trials_path=Path('/home/tberns/Speaker_Change_Recognition/trials/dev-clean.trials.txt'))
-    eval_spid(embedding_files=test_embedding_files,
-                trials_path=Path('/home/tberns/Speaker_Change_Recognition/trials/test-clean.trials.txt'))
+    eer_dev = eval_spid(embedding_files=dev_embedding_files,
+                        trials_path=Path('/home/tberns/Speaker_Change_Recognition/trials/dev-clean.trials.txt'))
+    eer_test = eval_spid(embedding_files=test_embedding_files,
+                         trials_path=Path('/home/tberns/Speaker_Change_Recognition/trials/test-clean.trials.txt'))
+
+    save_string = f"{version_number:0>7}-{'best'}.{trans_file[:-4]}"
+    utils.json_dump(path=Path("logs") / "measures" /
+                    f"{save_string}.eer.json", data={"dev": eer_dev, "test": eer_test})
+    
+    
+def temp():
+    long_sample = LirbriSpeechItem(
+        file_name="/ceph/csedu-scratch/other/tberns/afjiv.wav",
+        transcription=".",
+        speaker_id='t',
+        book_id='t',
+        utterance_id='t'
+    )
+    batch = pad_collate(long_sample)
+    checkpoint_path = "/home/tberns/Speaker_Change_Recognition/lightning_logs/2537373/checkpoints/epoch_0027.step_000074500.val-wer_0.0499.best.ckpt"
+    # checkpoint_path = "/home/tberns/Speaker_Change_Recognition/lightning_logs/version_2536477/checkpoints/epoch_0033.step_000095000.val-wer_0.0506.best.ckpt"
+    vocab_path = "/home/tberns/Speaker_Change_Recognition/src/models/vocab_spid.json"
+    wav2vec2_module, ckpt_version, checkpoint_path, prefix = load_module(
+        checkpoint_path, vocab_path)
+    output = wav2vec2_module.forward(batch)
+
+    logits = wav2vec2_module._preprocess_logits(output.logits)
+    hypothesis = wav2vec2_module._get_hypothesis(logits)
+    print(hypothesis)
 
 
 if __name__ == "__main__":
-    pl.seed_everything(Config.seed)
-    eval_all()
-    # long_sample = LirbriSpeechItem(
-    #     file_name="/home/tberns/Speaker_Change_Recognition/long_silence.wav",
-    #     transcription="# we shall make more money up here this winter than you can earn in detroid in three years",
-    #     speaker_id='t',
-    #     book_id='t',
-    #     utterance_id='t'
-    # )
-    # batch = pad_collate(long_sample)
-    # checkpoint_path = "/home/tberns/Speaker_Change_Recognition/lightning_logs/version_2537373/checkpoints/epoch_0027.step_000074500.val-wer_0.0499.best.ckpt"
-    # # checkpoint_path = "/home/tberns/Speaker_Change_Recognition/lightning_logs/version_2536477/checkpoints/epoch_0033.step_000095000.val-wer_0.0506.best.ckpt"
-    # vocab_path = "/home/tberns/Speaker_Change_Recognition/src/models/vocab_spid.json"
-    # wav2vec2_module, ckpt_version, checkpoint_path, prefix = load_module(
-    #     checkpoint_path, vocab_path)
-    # output = wav2vec2_module.forward(batch)
-
-    # torch.save(output.logits,"logits_235.pt")
-    # logits = wav2vec2_module._preprocess_logits(output.logits)
-    # torch.save(logits,"logits_33.pt")
-    # hypothesis = wav2vec2_module._get_hypothesis(logits)
-    # breakpoint()
-    # torch.save(wav2vec2_module.model.lm_head.state_dict(),"head_params.pt")
-    # print(hypothesis)
+    # pl.seed_everything(Config.seed)
+    # eval_all()
+    temp()

@@ -147,7 +147,7 @@ class SpeakerRecognitionEvaluator:
         prediction_pairs = []
         ground_truth_scores_b = []
 
-        for pair in pairs:
+        for pair in tqdm(pairs):
             gt = 1 if pair.same_speaker else 0
             if pair.left in sample_map and pair.right in sample_map:
                 
