@@ -194,7 +194,7 @@ def temp():
         utterance_id='t'
     )
     batch = pad_collate(long_sample)
-    checkpoint_path = "/home/tberns/Speaker_Change_Recognition/lightning_logs/2537373/checkpoints/epoch_0027.step_000074500.val-wer_0.0499.best.ckpt"
+    checkpoint_path = "/home/tberns/Speaker_Change_Recognition/lightning_logs/version_2537373/checkpoints/epoch_0027.step_000074500.val-wer_0.0499.best.ckpt"
     # checkpoint_path = "/home/tberns/Speaker_Change_Recognition/lightning_logs/version_2536477/checkpoints/epoch_0033.step_000095000.val-wer_0.0506.best.ckpt"
     vocab_path = "/home/tberns/Speaker_Change_Recognition/src/models/vocab_spid.json"
     wav2vec2_module, ckpt_version, checkpoint_path, prefix = load_module(
