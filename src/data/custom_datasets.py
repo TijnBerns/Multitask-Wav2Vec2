@@ -6,9 +6,8 @@ from torch.functional import Tensor
 import torchaudio
 from config import Config
 from torch.nn.utils.rnn import pad_sequence
-from torch.utils.data import Dataset, DataLoader, RandomSampler, SequentialSampler
+from torch.utils.data import DataLoader
 from torch.utils.data._utils.collate import default_collate
-import itertools
 from typing import Union, List
 import pandas as pd
 import torchdata.datapipes as dp

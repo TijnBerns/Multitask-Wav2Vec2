@@ -1,6 +1,6 @@
 
 from config import Config
-import data.datasets as data
+import data.custom_datasets as data
 import utils
 import models.wav2vec2
 import pytorch_lightning as pl

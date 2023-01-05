@@ -1,10 +1,10 @@
+import sys
+sys.path.append('src')
 from config import Config
 import re
 from typing import List, Union
 from dataclasses import dataclass
 import torch
-import sys
-sys.path.append('src')
 
 
 class PreProcessor():

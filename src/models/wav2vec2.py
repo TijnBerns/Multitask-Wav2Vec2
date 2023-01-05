@@ -17,7 +17,7 @@ import pytorch_lightning as pl
 
 from models.processor import StripSpeakerChange, PostProcessor
 from models.tri_stage import TriStageLearningRateLambdaLRFunction as TriStageLR
-from data.datasets import LirbriSpeechBatch
+from data.custom_datasets import LirbriSpeechBatch
 from evaluation.evaluator import EmbeddingSample
 import numpy as np
 

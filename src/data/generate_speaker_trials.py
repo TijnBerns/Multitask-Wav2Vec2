@@ -20,7 +20,7 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader
 
 from src.evaluation.evaluator import SpeakerTrial
-from data.datasets import CustomLibriSpeechDataset, LirbriSpeechItem
+from src.data.custom_datasets import CustomLibriSpeechDataset, LirbriSpeechItem
 
 
 ########################################################################################

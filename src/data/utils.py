@@ -4,7 +4,6 @@ from typing import List
 import torchaudio
 import json
 from config import Config
-from data.datasets import CustomLibriSpeechDataset
 from typing import List, Union, Dict
 import pandas as pd
 import re
@@ -143,8 +142,7 @@ def write_trans_from_source(source_trans: Path, target_trans: Path, trans_fn: bo
 # Writing vocabularies based on ids in dataste
 
 
-def write_speaker_id_vocab(dataset: CustomLibriSpeechDataset,
-                           spid_vocab_path: Union[Path, str]) -> None:
+def write_speaker_id_vocab(dataset, spid_vocab_path: Union[Path, str]) -> None:
     if isinstance(spid_vocab_path, str):
         spid_vocab_path = Path(spid_vocab_path)
 

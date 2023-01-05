@@ -1,6 +1,6 @@
 import click
 import utils
-import data.datasets as data
+import data.custom_datasets as data
 from config import Config
 
 from pathlib import Path
@@ -9,7 +9,7 @@ import models.wav2vec2
 import pytorch_lightning as pl
 from typing import Optional, List
 from evaluation.evaluator import SpeakerTrial, SpeakerRecognitionEvaluator, EmbeddingSample
-from data.datasets import LirbriSpeechItem, pad_collate
+from data.custom_datasets import LirbriSpeechItem, pad_collate
 from tqdm import tqdm
 from collections import defaultdict
 from pprint import pprint
@@ -22,13 +22,15 @@ def get_datasets(trans_file: str):
         # Development sets
         {
             "dev-no-rep": data.build_datapipe(Config.datapath + f'/dev-clean-no-rep/{trans_file}'),
-            "dev-rep": data.build_datapipe(Config.datapath + f'/dev-clean-rep/{trans_file}'),
+            "dev-repA": data.build_datapipe(Config.datapath + f'/dev-clean-rep/{trans_file}'),
+            "dev-repB": data.build_datapipe(Config.datapath + f'/dev-clean-repB/{trans_file}'),
             "dev-clean": data.build_datapipe(Config.datapath + f'/LibriSpeech/dev-clean.{trans_file}')
         },
         # Test sets
         {
             "test-no-rep": data.build_datapipe(Config.datapath + f'/test-clean-no-rep/{trans_file}'),
-            "test-rep": data.build_datapipe(Config.datapath + f'/test-clean-rep/{trans_file}'),
+            "test-repA": data.build_datapipe(Config.datapath + f'/test-clean-rep/{trans_file}'),
+            "test-repB": data.build_datapipe(Config.datapath + f'/test-clean-repB/{trans_file}'),
             "test-clean": data.build_datapipe(Config.datapath + f'/LibriSpeech/test-clean.{trans_file}')
         }
     ]
@@ -185,28 +187,28 @@ def eval_all(
                     f"{save_string}.eer.json", data={"dev": eer_dev, "test": eer_test})
     
     
-def temp():
-    long_sample = LirbriSpeechItem(
-        file_name="/ceph/csedu-scratch/other/tberns/afjiv.wav",
-        transcription=".",
-        speaker_id='t',
-        book_id='t',
-        utterance_id='t'
-    )
-    batch = pad_collate(long_sample)
-    checkpoint_path = "/home/tberns/Speaker_Change_Recognition/lightning_logs/version_2537373/checkpoints/epoch_0027.step_000074500.val-wer_0.0499.best.ckpt"
-    # checkpoint_path = "/home/tberns/Speaker_Change_Recognition/lightning_logs/version_2536477/checkpoints/epoch_0033.step_000095000.val-wer_0.0506.best.ckpt"
-    vocab_path = "/home/tberns/Speaker_Change_Recognition/src/models/vocab_spid.json"
-    wav2vec2_module, ckpt_version, checkpoint_path, prefix = load_module(
-        checkpoint_path, vocab_path)
-    output = wav2vec2_module.forward(batch)
+# def temp():
+#     long_sample = LirbriSpeechItem(
+#         file_name="/ceph/csedu-scratch/other/tberns/afjiv.wav",
+#         transcription=".",
+#         speaker_id='t',
+#         book_id='t',
+#         utterance_id='t'
+#     )
+#     batch = pad_collate(long_sample)
+#     checkpoint_path = "/home/tberns/Speaker_Change_Recognition/lightning_logs/version_2537373/checkpoints/epoch_0027.step_000074500.val-wer_0.0499.best.ckpt"
+#     # checkpoint_path = "/home/tberns/Speaker_Change_Recognition/lightning_logs/version_2536477/checkpoints/epoch_0033.step_000095000.val-wer_0.0506.best.ckpt"
+#     vocab_path = "/home/tberns/Speaker_Change_Recognition/src/models/vocab_spid.json"
+#     wav2vec2_module, ckpt_version, checkpoint_path, prefix = load_module(
+#         checkpoint_path, vocab_path)
+#     output = wav2vec2_module.forward(batch)
 
-    logits = wav2vec2_module._preprocess_logits(output.logits)
-    hypothesis = wav2vec2_module._get_hypothesis(logits)
-    print(hypothesis)
+#     logits = wav2vec2_module._preprocess_logits(output.logits)
+#     hypothesis = wav2vec2_module._get_hypothesis(logits)
+#     print(hypothesis)
 
 
 if __name__ == "__main__":
-    # pl.seed_everything(Config.seed)
-    # eval_all()
-    temp()
+    pl.seed_everything(Config.seed)
+    eval_all()
+    # temp()

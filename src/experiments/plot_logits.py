@@ -1,6 +1,6 @@
 import click
 import utils
-import data.datasets as datasets
+import src.data.custom_datasets as custom_datasets
 from config import Config
 
 from pathlib import Path

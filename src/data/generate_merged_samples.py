@@ -5,8 +5,9 @@ import torchaudio
 import torch
 import random
 from tqdm import tqdm
-from typing import List
+from typing import List, Dict
 from config import Config
+from collections import defaultdict
 
 
 wav_idx = 0
@@ -60,14 +61,17 @@ class PairGenerator():
             sample, sample_idx = self._select_sample(
                 dataset, speaker_dict, sample)
 
+            # Return if no sample could be selected
             if sample_idx == -1:
                 return pair
 
             # Add sample to the pair and update the number of added tokens
             pair.append(sample)
             speaker_id = str(sample[speaker_idx])
-            speaker_dict = self._remove_from_dict(
-                speaker_dict, speaker_id, sample_idx)
+            book_id = str(sample[book_idx])
+
+            speaker_dict = self._remove_from_dict(speaker_dict, speaker_id, book_id, sample_idx)
+
             added_tokens += sample[wav_idx].size(dim=1)
 
         return pair
@@ -110,19 +114,20 @@ class PairGenerator():
         return transcription + transcriptions[-1]
 
     def _get_speaker_dict(self, dataset: torchaudio.datasets.LIBRISPEECH):
-        speaker_dict = {}
+        speaker_dict = defaultdict(lambda: defaultdict(list))
 
         for i, sample in tqdm(enumerate(dataset), desc="Generating sample dictionary"):
-            if speaker_dict.get(str(sample[speaker_idx]), -1) == -1:
-                speaker_dict[str(sample[speaker_idx])] = [i]
-            else:
-                speaker_dict[str(sample[speaker_idx])].append(i)
+            speaker_id = str(sample[speaker_idx])
+            book_id = str(sample[book_idx])
+            speaker_dict[speaker_id][book_id].append(i)
 
         return speaker_dict
 
-    def _remove_from_dict(self, speaker_dict: dict, speaker_id: str, sample_idx: int):
-        speaker_dict[speaker_id].remove(sample_idx)
-
+    def _remove_from_dict(self, speaker_dict: Dict[str, Dict[str, List[int]]], speaker_id: str, book_id: str, sample_idx: int):
+        speaker_dict[speaker_id][book_id].remove(sample_idx)
+        if len(speaker_dict[speaker_id][book_id]) == 0:
+            speaker_dict[speaker_id].pop(book_id)
+            
         if len(speaker_dict[speaker_id]) == 0:
             speaker_dict.pop(speaker_id)
 
@@ -135,29 +140,74 @@ class PairGenerator():
 class PairGeneratorNoRepeat(PairGenerator):
     def _select_sample(self, dataset, speaker_dict, prev_sample: List = []):
         speaker_ids = list(speaker_dict.keys())
-
+        
+        # Remove previous speaker id from list
         if len(prev_sample) != 0:
-            if len(speaker_ids) == 1 and speaker_ids[0] == str(prev_sample[speaker_idx]):
-                return [], -1
             try:
                 speaker_ids.remove(str(prev_sample[speaker_idx]))
             except ValueError:
                 pass
+        
+            if len(speaker_ids) == 0:
+                return [], -1
 
         speaker_id = random.choice(speaker_ids)
-        sample_idx = random.choice(speaker_dict[speaker_id])
+        book_id = random.choice(list(speaker_dict[speaker_id]))
+        sample_idx = random.choice(speaker_dict[speaker_id][book_id])
         sample = dataset[sample_idx]
         return sample, sample_idx
 
-
-class PairGeneratorRepeat(PairGenerator):
+class PairGeneratorRepeatA(PairGenerator):
     def _select_sample(self, dataset, speaker_dict: dict, prev_sample: list = []):
-        speaker_id = list(speaker_dict.keys())[0]
-        sample_idx = speaker_dict[speaker_id][0]
+        if len(prev_sample) == 0:
+            # Select first available speaker_id and book_id
+            speaker_id = list(speaker_dict.keys())[0]
+            book_id = list(speaker_dict[speaker_id])[0]
+        else:
+            # Select same speaker_id and book_id as previous sample
+            speaker_id = str(prev_sample[speaker_idx])
+            book_id = str(prev_sample[speaker_idx])
+        
+        # Check if sample is available
+        if len(speaker_dict[speaker_id][book_id]) == 0:
+            return [], -1 
+        
+        sample_idx = speaker_dict[speaker_id][book_id][0]
         sample = dataset[sample_idx]
-
-        # Check if selected sample is from the same book as the previous sample
-        if len(prev_sample) != 0 and sample[book_idx] != prev_sample[book_idx]:
-            return [], -1
-
         return sample, sample_idx
+    
+class PairGeneratorRepeatB(PairGenerator):   
+    def _select_sample(self, dataset, speaker_dict: dict, prev_sample: list = []):
+        # If no previous sample, select first speaker_id
+        if len(prev_sample) == 0:
+            speaker_id = list(speaker_dict.keys())[0]
+        else:
+            speaker_id = str(prev_sample[speaker_idx])
+
+        # Remove the previously selected book from the list of books
+        book_ids = list(speaker_dict[speaker_id])
+        try:
+            book_ids.remove(str(prev_sample[book_idx]))
+        except:
+            ValueError, IndexError
+            
+        # Select random book different from previous sample, if possible
+        if len(book_ids) == 0:
+            book_id = str(prev_sample[book_idx])
+        else:
+            book_id = str(random.choice(book_ids))
+            
+        # Select random sample for selected speaker and book, if possible
+        if len(speaker_dict[speaker_id][book_id]) == 0:
+            return [], -1
+        
+        sample_idx = random.choice(speaker_dict[speaker_id][book_id])
+        sample = dataset[sample_idx]
+        return sample, sample_idx
+        
+        
+        
+            
+            
+    
+
