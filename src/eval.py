@@ -22,14 +22,14 @@ def get_datasets(trans_file: str):
         # Development sets
         {
             "dev-no-rep": data.build_datapipe(Config.datapath + f'/dev-clean-no-rep/{trans_file}'),
-            "dev-repA": data.build_datapipe(Config.datapath + f'/dev-clean-rep/{trans_file}'),
+            "dev-repA": data.build_datapipe(Config.datapath + f'/dev-clean-repA/{trans_file}'),
             "dev-repB": data.build_datapipe(Config.datapath + f'/dev-clean-repB/{trans_file}'),
             "dev-clean": data.build_datapipe(Config.datapath + f'/LibriSpeech/dev-clean.{trans_file}')
         },
         # Test sets
         {
             "test-no-rep": data.build_datapipe(Config.datapath + f'/test-clean-no-rep/{trans_file}'),
-            "test-repA": data.build_datapipe(Config.datapath + f'/test-clean-rep/{trans_file}'),
+            "test-repA": data.build_datapipe(Config.datapath + f'/test-clean-repA/{trans_file}'),
             "test-repB": data.build_datapipe(Config.datapath + f'/test-clean-repB/{trans_file}'),
             "test-clean": data.build_datapipe(Config.datapath + f'/LibriSpeech/test-clean.{trans_file}')
         }
@@ -66,18 +66,21 @@ def eval_spid(embedding_files: List[str], trials_path):
             embeddings = pickle.load(open(embedding_file, "rb"))[hidden_state]
             len_dict[embedding_file] = len(embeddings)
             keys.append(set([embedding.sample_id for embedding in embeddings]))
-        
+
         # Compute intersection of all keys
         try:
             keys_intersection = set.intersection(*keys)
         except TypeError:
             return eer_dict
-
+        
+        
+        
         for embedding_file in embedding_files:
             embeddings: List[EmbeddingSample] = pickle.load(
                 open(embedding_file, "rb"))[hidden_state]
             embeddings_filtered = list(filter(
                 lambda e: e.sample_id in keys_intersection, embeddings))
+            breakpoint()
 
             print(f'Computing EER for {embedding_file} ({len(embeddings_filtered)}/{len(embeddings)} embeddings)...')
             eer = SpeakerRecognitionEvaluator.evaluate(
@@ -88,6 +91,8 @@ def eval_spid(embedding_files: List[str], trials_path):
             print(f'EER:       {100 * eer:.2f}%\n' +
                 f'Emb. used: {len(embeddings_filtered)}/{len(embeddings)}\n')
             eer_dict[str(embedding_file)].append(100 * eer)
+            
+        
 
     return eer_dict
 
@@ -167,8 +172,8 @@ def eval_all(
     checkpoints = Path(
         f"lightning_logs/version_{version_number}").rglob("*best*.ckpt")
 
-    for checkpoint_path in checkpoints:
-        eval_asr(trans_file, vocab_path, checkpoint_path)
+    # for checkpoint_path in checkpoints:
+    #     eval_asr(trans_file, vocab_path, checkpoint_path)
 
     # Get paths to best embeddings
     dev_embedding_files = list(

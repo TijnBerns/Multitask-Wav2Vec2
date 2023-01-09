@@ -74,9 +74,8 @@ def main(merge: bool, transcribe: bool, create_vocabs: bool):
         for dataset, dataset_str, num_samples in [
             (custom_datasets.clean_datasets["dev-clean"], "dev-clean", 10e6),
             (custom_datasets.clean_datasets["test-clean"], "test-clean", 10e6),
-            (custom_datasets.clean_datasets["val-clean"], "val-clean", 10e6),
-            (custom_datasets.clean_datasets["train-clean-100"],
-             "train-clean-100", 10e6)
+            # (custom_datasets.clean_datasets["val-clean"], "val-clean", 10e6),
+            # (custom_datasets.clean_datasets["train-clean-100"], "train-clean-100", 10e6)
         ]:
             merge_dataset(dataset, dataset_str, num_samples)
 

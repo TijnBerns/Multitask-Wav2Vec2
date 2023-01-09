@@ -87,14 +87,14 @@ class Wav2Vec2Module(pl.LightningModule):
         self.batch_size: int = batch_size
 
         # temporary attributes
-        
+
         self.size_mismatch_count = 0
-        
+
     def initMetrics(self, dataset_type):
         self.val_stats: SpeakerChangeStats = SpeakerChangeStats(prefix="val")
-        self.test_stats: SpeakerChangeStats = SpeakerChangeStats(prefix=dataset_type)
+        self.test_stats: SpeakerChangeStats = SpeakerChangeStats(
+            prefix=dataset_type)
         self.test_preds: List[Dict] = []
-        
 
     def forward(self, batch: LirbriSpeechBatch, **kwargs) -> CausalLMOutput:
         waveforms = batch.waveforms
@@ -120,7 +120,7 @@ class Wav2Vec2Module(pl.LightningModule):
 
     def training_step(self, batch: LirbriSpeechBatch, batch_idx):
         output = self.forward(batch)
-        
+
         self.log("train_loss", output.loss, batch_size=self.batch_size)
         return output.loss
 
@@ -152,7 +152,7 @@ class Wav2Vec2Module(pl.LightningModule):
                 "reference": trans,
                 "hypothesis": hyp
             })
-            
+
         # Update and log statistics
         self.test_stats(hypothesis, transcription)
         self.log("test_loss", output.loss, batch_size=self.batch_size)
@@ -167,7 +167,7 @@ class Wav2Vec2Module(pl.LightningModule):
 
             reconstruced_keys, embbeding_idx = utils.reconstruct_keys(
                 batch.keys[i])
-            
+
             if len(set(embbeding_idx)) != len(speaker_change_idx):
                 self.size_mismatch_count += 1
                 return output.loss
@@ -175,10 +175,11 @@ class Wav2Vec2Module(pl.LightningModule):
             # Add found embeddings and their corresponding keys to lists
             for k, hidden_states in enumerate(output.hidden_states):
                 for j in embbeding_idx:
-                    embedding = hidden_states.squeeze()[speaker_change_idx][j].to('cpu')
+                    embedding = hidden_states.squeeze(
+                    )[speaker_change_idx][j].to('cpu')
                     key = reconstruced_keys[j]
                     self.embeddings[k].append(EmbeddingSample(key, embedding))
-                
+
             self.embeddings_queue.extend(speaker_change_idx)
 
         return output.loss
@@ -257,7 +258,7 @@ class Wav2Vec2Module(pl.LightningModule):
 
     def reset_saves(self):
         self.embeddings = defaultdict(list)
-        self.test_preds = defaultdict(list) 
+        self.test_preds = defaultdict(list)
         return
 
     def _compute_mean_std_batch(self, all_tensors: List[torch.Tensor]):
@@ -286,27 +287,24 @@ class Wav2Vec2Module(pl.LightningModule):
         return hypothesis
 
     def _extract_embeddings(self, hidden_states: Tuple[torch.Tensor], processed_logits):
-        # Set all logit values where no speaker change is predicted to 0
-        speaker_change_logits = torch.where(torch.argmax(processed_logits, dim=-1) == 32, processed_logits[:, 32], 0)
+        speaker_change_idx = torch.where(
+            torch.argmax(processed_logits, dim=-1) == 32)[0]
+        speaker_change_logits = processed_logits[:, 32][speaker_change_idx]
 
-        # Apply max-pooling to find speaker change predictions with largest logit values
-        speaker_change_logits = speaker_change_logits.reshape(1, -1)
-        _, max_speaker_change_idx = F.max_pool1d(speaker_change_logits,
-                                                 kernel_size=self.kernel_size, stride=self.kernel_size,
-                                                 padding=self.kernel_size // 2,
-                                                 return_indices=True)
+        max_speaker_change_idx = []
+        start = 0
+        for i in range(len(speaker_change_idx)):
+            if i == len(speaker_change_idx) - 1:
+                pass
+            elif speaker_change_idx[i + 1] == speaker_change_idx[i] + 1:
+                continue
 
-        # Gather the speaker change logits of the found max indexes
-        max_speaker_change_logits = torch.gather(speaker_change_logits, dim=1, index=max_speaker_change_idx)
+            idx_temp = torch.argmax(speaker_change_logits[start: i+1]).item()
+            idx = speaker_change_idx[start: i+1][idx_temp].item()
+            max_speaker_change_idx.append(idx)
+            start = i + 1
 
-        # Only use the indexes where the logit value has not been set to 0
-        speaker_change_idx: torch.Tensor = max_speaker_change_idx[torch.where(max_speaker_change_logits != 0)]
-
-        if speaker_change_idx.shape[0] == 0:
-            speaker_change_idx = torch.tensor([0])
-
-        # Save the found speaker embeddings
-        return speaker_change_idx
+        return torch.tensor(max_speaker_change_idx)
 
     def _add_batch_to_embedding_queue(self, embedding: torch.Tensor):
         # make sure to keep it into CPU memory
