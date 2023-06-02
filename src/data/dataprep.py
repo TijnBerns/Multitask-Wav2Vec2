@@ -7,7 +7,7 @@ from config import Config
 from typing import List, Union, Dict
 import data.datasets as datasets
 import data.utils
-from src.data.generate_merged_samples import PairGeneratorRepeat, PairGeneratorNoRepeat
+from data.generate_merged_samples import PairGeneratorRepeat, PairGeneratorNoRepeat
 from tqdm import tqdm
 
 

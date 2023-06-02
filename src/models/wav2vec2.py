@@ -136,7 +136,7 @@ class Wav2Vec2Module(pl.LightningModule):
         self.log("val_loss", output.loss, batch_size=self.batch_size)
         return output.loss
 
-    def validation_epoch_end(self, outputs: List[torch.Tensor]) -> None:
+    def on_validation_epoch_end(self) -> None:
         self.log_dict(self.val_stats.compute_and_reset())
         return
 
@@ -183,7 +183,7 @@ class Wav2Vec2Module(pl.LightningModule):
 
         return output.loss
 
-    def test_epoch_end(self, outputs: Any) -> None:
+    def on_test_epoch_end(self) -> None:
         self.log_dict(self.test_stats.compute_and_reset())
         # update the mean & std of test embeddings
         # if self.save_embeddings:

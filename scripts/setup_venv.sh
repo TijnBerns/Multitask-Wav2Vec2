@@ -15,7 +15,7 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 # If you call this script on your local computer (e.g, hostname != cn99, cn47 or cn48)
 # the virtual environment will just be created in the root directory of this prvirtual_environmentsoject.
 
-if [ "$HOSTNAME" != "cn99" ] && [ "$HOSTNAME" != "cn47" ] && [ "$HOSTNAME" != "cn48" ]; then
+if [ "$HOSTNAME" != "cn84" ] && [ "$HOSTNAME" != "cn77" ] && [ "$HOSTNAME" != "cn47" ] && [ "$HOSTNAME" != "cn48" ]; then
   VENV_DIR=$PROJECT_DIR/venv
 else
   VENV_DIR=/scratch/$USER/virtual_environments/asr

@@ -9,7 +9,7 @@ cd "$SCRIPT_DIR" || exit 1
 mkdir -p /ceph/csedu-scratch/other/"$USER"/checkpoints
 ln -sfn /ceph/csedu-scratch/other/"$USER"/checkpoints "$SCRIPT_DIR"/../checkpoints
 
-mkdir -p /ceph/csedu-scratch/course/IMC030_MLIP/users/"$USER"/lightning_logs
+mkdir -p /ceph/csedu-scratch/other/"$USER"/lightning_logs
 ln -sfn /ceph/csedu-scratch/other/"$USER"/lightning_logs "$SCRIPT_DIR"/../lightning_logs
 
 mkdir -p /ceph/csedu-scratch/other/"$USER"/logs
@@ -18,19 +18,14 @@ ln -sfn /ceph/csedu-scratch/other/"$USER"/logs "$SCRIPT_DIR"/../logs
 mkdir -p /scratch/"$USER"/asr/data/trials
 ln -sfn /scratch/"$USER"/asr/data/trials "$SCRIPT_DIR"/../trials
 
+echo "### SETTING UP VIRTUAL ENVIRONMENT ON CN84 ###"
+./setup_venv.sh
 
-# make sure that there's also a virtual environment
-# on the GPU nodes
+echo "### SETTING UP VIRTUAL ENVIRONMENT ON CN77 ###"
+srun -p csedu-prio -A cseduproject -q csedu-small -w cn77 rsync -a cn84:/scratch/"$USER"/ /scratch/"$USER"/
+
 echo "### SETTING UP VIRTUAL ENVIRONMENT ON CN47 ###"
-ssh cn47 "
-  source .profile
-  cd $PWD;
-  ./setup_venv.sh;
-"
+srun -p csedu-prio -A cseduproject -q csedu-small -w cn47 rsync -a cn84:/scratch/"$USER"/ /scratch/"$USER"/
 
 echo "### SETTING UP VIRTUAL ENVIRONMENT ON CN48 ###"
-ssh cn48 "
-  source .profile
-  cd $PWD;
-  ./setup_venv.sh;
-"
+srun -p csedu-prio -A cseduproject -q csedu-small -w cn48 rsync -a cn84:/scratch/"$USER"/ /scratch/"$USER"/

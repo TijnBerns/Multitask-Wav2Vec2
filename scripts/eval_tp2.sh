@@ -1,11 +1,12 @@
-#!/usr/bin/env bash
+#!/bin/bash
+#SBATCH --account=cseduproject
 #SBATCH --partition=csedu
+#SBATCH --qos=csedu-small
 #SBATCH --gres=gpu:1
-#SBATCH --mem=10G
-#SBATCH --cpus-per-task=2
+#SBATCH --cpus-per-task=1
 #SBATCH --time=2:00:00
-#SBATCH --output=./logs/slurm/%J.out
-#SBATCH --error=./logs/slurm/%J.err
+#SBATCH --output=./logs/%J.out
+#SBATCH --error=./logs/%J.out
 
 
 project_dir=.

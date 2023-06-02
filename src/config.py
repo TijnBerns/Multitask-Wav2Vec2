@@ -5,6 +5,10 @@ from dataclasses import dataclass
 class Config():
     def __init__(self, job_id) -> None:
         self.job_id = job_id
+    
+    # Change the following two attributes to the path where data is stored or downloaded, and logs are saved to.
+    datapath: str = "/scratch/tberns/asr/data"
+    logpath: str = "/home/tberns/Speaker_Change_Recognition/logs"
 
     sample_rate: int = 16_000
     seed: int = 0
@@ -12,12 +16,9 @@ class Config():
     # parameters for dataset and dataloaders
     batch_size: int = 1
     effective_batch_size: int = 8
-    num_workers: int = 3
+    num_workers: int = 2
     max_token_count: int = 40 * sample_rate
-    datapath: str = "/scratch/tberns/asr/data"
-    logpath: str = "/home/tberns/Speaker_Change_Recognition/logs"
-    # datapath = "/ceph/csedu-scratch/course/IMC030_MLIP/users/tberns/asr"
-    # datapath: str = "/home/tijn/CS/Master/Speaker_Change_Recognition/data"
+
     
     # Training parameters
     lr_stage_one: float = 1e-3

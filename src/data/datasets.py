@@ -117,7 +117,7 @@ def check_batch_format(batch: List[any]):
     return batch[0]
 
 
-def initialize_loader(datapipe: dp.iter.IterDataPipe, shuffle: bool):
+def initialize_loader(datapipe, shuffle: bool):
     dataloader = DataLoader(
         dataset=datapipe,
         num_workers=Config.num_workers,
@@ -157,49 +157,12 @@ def _get_split_index(dataset, start_index):
 
 
 train_tmp = torchaudio.datasets.LIBRISPEECH(
-    root=Config.datapath, url="train-clean-100")
+    root=Config.datapath, url="train-clean-100", download=True)
 train_set, val_set = split_dataset(train_tmp, Config.train_split)
 
 clean_datasets = {"train-clean-100": train_set,
                   "val-clean": val_set,
-                  "dev-clean": torchaudio.datasets.LIBRISPEECH(root=Config.datapath, url="dev-clean"),
-                  "test-clean": torchaudio.datasets.LIBRISPEECH(root=Config.datapath, url="test-clean"),
+                  "dev-clean": torchaudio.datasets.LIBRISPEECH(root=Config.datapath, url="dev-clean", download=True),
+                  "test-clean": torchaudio.datasets.LIBRISPEECH(root=Config.datapath, url="test-clean", download=True),
                   }
 
-# @
-# class CustomLibriSpeechDataset(Dataset):
-#     def __init__(self, trans_file: Union[list, str]) -> None:
-#         super().__init__()
-
-#         if type(trans_file) == str:
-#             self.trans_file = [trans_file]
-#         elif type(trans_file) == list:
-#             self.trans_file = trans_file
-#         else:
-#             raise ValueError(
-#                 f"Exptected trans_file to be of type None or str but got {type(trans_file)}.")
-
-#         self.samples: List[LirbriSpeechItem] = self._load_samples()
-
-#     def _load_transcriptions(self):
-#         transcriptions = pd.concat((pd.read_csv(f) for f in self.trans_file))
-#         transcriptions.drop_duplicates()
-#         return transcriptions
-
-#     def _load_samples(self):
-#         transcriptions = self._load_transcriptions()
-#         samples = [0] * len(transcriptions)
-#         for i, sample in enumerate(transcriptions.iterrows()):
-#             sample = sample[1]
-#             samples[i] = LirbriSpeechItem(file_name=sample["path"],
-#                                           transcription=sample["transcription"],
-#                                           speaker_id=sample["speaker_id"],
-#                                           book_id=sample["book_id"],
-#                                           utterance_id=sample["utterance_id"])
-#         return samples
-
-#     def __len__(self):
-#         return len(self.samples)
-
-#     def __getitem__(self, idx):
-#         return self.samples[idx]
