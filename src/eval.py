@@ -207,6 +207,6 @@ def temp():
 
 
 if __name__ == "__main__":
-    # pl.seed_everything(Config.seed)
-    # eval_all()
-    temp()
+    pl.seed_everything(Config.seed)
+    eval_all()
+    # temp()
