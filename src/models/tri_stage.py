@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 ################################################################################
 #
 # Implement a class which can be given as function to `LambdaLR` to act

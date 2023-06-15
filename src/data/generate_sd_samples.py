@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import sys
 sys.path.append('src')
 import torchaudio
@@ -14,7 +16,7 @@ class SDSample():
         self.id = id
         self.rttm = rttm
         self.recording = recording
-        
+
     def __repr__(self) -> str:
         return f'SDSample("{self.id}, {self.rttm}, {self.recording}")'
 
@@ -44,7 +46,7 @@ class SDSampleGenerator():
 
             sample_count += 1
             if len(self.speakers) == 0:
-                break        
+                break
 
     def _generate_single_sample(self, id):
         # Generate random number of speakers between MIN and MAX and selected that many speakers
@@ -65,28 +67,28 @@ class SDSampleGenerator():
             duration = utterance.shape[-1]
 
             if total_duration + duration > self.MAX_DURATION:
-                break            
-            
+                break
+
             # Add selected utterance and speaker
             utterances.append(utterance)
             speakers.append(speaker)
-            
-            # Remove selected utterance from files 
+
+            # Remove selected utterance from files
             self.files[speaker].remove(utterance_file)
             if len(self.files[speaker]) == 0:
                 self.files.pop(speaker)
                 self.speakers.remove(speaker)
                 selected_speakers.remove(speaker)
-                
+
             total_duration += duration
             speaker = set([speaker])
-            
+
             if len(list(selected_speakers - speaker)) == 0:
                 break
-            
-        # Generate RTTM string     
+
+        # Generate RTTM string
         rttm = self._generate_rttm(id, utterances, speakers)
-        
+
         # Concatenate selected utterances
         recording = torch.cat(utterances, dim=1)
         return SDSample(id, rttm, recording)
@@ -96,7 +98,7 @@ class SDSampleGenerator():
         start = 0
         for utterance, speaker in zip(utterances, speakers):
             duration = utterance.shape[-1] / 16_000
-            rttm += f"SPEAKER {id} 1 {start:.6f} {duration:.6f} <NA> <NA> {speaker} <NA> <NA>\n" 
+            rttm += f"SPEAKER {id} 1 {start:.6f} {duration:.6f} <NA> <NA> {speaker} <NA> <NA>\n"
             start += duration
         return rttm
 

@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from pathlib import Path
 from tqdm import tqdm
 from typing import List
@@ -110,7 +112,7 @@ def add_speaker_start(row: pd.Series) -> pd.Series:
 
 
 def add_speaker_ids(row: pd.Series, spch_symbol: bool = False) -> pd.Series:
-    """Replaces the speaker change symbol in the transcription with the speaker id 
+    """Replaces the speaker change symbol in the transcription with the speaker id
 
     Args:
         row (pd.Series): Row of which the transcription is altered.

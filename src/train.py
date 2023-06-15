@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 
 from config import Config
 import data.datasets as data
@@ -22,15 +23,15 @@ def main(train_trans: Union[List[str], str, None], val_trans: Union[List[str], s
     device, _ = utils.set_device()
     train_trans = list(train_trans)
     val_trans = list(val_trans)
-    
+
     # Load datasets
     train_pipe = data.build_datapipe(train_trans, dynamic_batch_size=False)
-    val_pipe = data.build_datapipe(val_trans, dynamic_batch_size=False) 
-        
+    val_pipe = data.build_datapipe(val_trans, dynamic_batch_size=False)
+
     # Initialize dataloaders
     train_loader = data.initialize_loader(train_pipe, shuffle=True)
     val_loader = data.initialize_loader(val_pipe, shuffle=False)
-        
+
     # Initialize checkpointer
     pattern = "epoch_{epoch:04d}.step_{step:09d}.val-wer_{val_wer:.4f}"
     ModelCheckpoint.CHECKPOINT_NAME_LAST = pattern + ".last"
@@ -52,7 +53,7 @@ def main(train_trans: Union[List[str], str, None], val_trans: Union[List[str], s
                                                      batch_size=Config.batch_size,
                                                      stage=1,
                                                      vocab_path=vocab_path)
-    
+
 
     wav2vec2_module = wav2vec2_module.to(device)
 
@@ -67,7 +68,7 @@ def main(train_trans: Union[List[str], str, None], val_trans: Union[List[str], s
     first_stage.fit(model=wav2vec2_module,
                     train_dataloaders=train_loader,
                     val_dataloaders=val_loader)
-    
+
     # Prepare second stage
     wav2vec2_module.unfreeze()
     wav2vec2_module.model.freeze_feature_encoder()

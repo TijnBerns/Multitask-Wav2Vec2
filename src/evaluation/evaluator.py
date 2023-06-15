@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 ################################################################################
 #
 # Implement an Evaluator object which encapsulates the process
@@ -33,22 +35,22 @@ from pathlib import Path
 class EmbeddingSample:
     sample_id: str
     embedding: np.array
-    
+
     def __eq__(self, __o: object) -> bool:
         if isinstance(__o, EmbeddingSample):
             return __o.sample_id == self.sample_id
         return False
-    
+
     def __hash__(self) -> int:
         return hash(self.sample_id)
-        
-    
-class EmbeddingClustering:    
+
+
+class EmbeddingClustering:
     @classmethod
     def cluster(cls, embeddings: List[EmbeddingSample]):
         np_embeddings = np.array(list(map(lambda x: x.embedding, embeddings)))
         clustering = OPTICS(min_samples=5).fit(np_embeddings)
-        
+
 
 
 ########################################################################################
@@ -140,7 +142,7 @@ class SpeakerRecognitionEvaluator:
                 raise ValueError(f"duplicate key {sample.sample_id}")
 
             sample_map[sample.sample_id] = sample
-            
+
 
         # compute a list of ground truth scores and prediction scores
         ground_truth_scores_a = []
@@ -150,7 +152,7 @@ class SpeakerRecognitionEvaluator:
         for pair in tqdm(pairs):
             gt = 1 if pair.same_speaker else 0
             if pair.left in sample_map and pair.right in sample_map:
-                
+
                 s1 = sample_map[pair.left]
                 s2 = sample_map[pair.right]
 
@@ -158,7 +160,7 @@ class SpeakerRecognitionEvaluator:
                 prediction_pairs.append((s1, s2))
             else:
                 ground_truth_scores_b.append(gt)
-  
+
         if cohort is not None:
             prediction_scores = cls._compute_asnorm_prediction_scores(
                 prediction_pairs,
@@ -179,7 +181,7 @@ class SpeakerRecognitionEvaluator:
         # ground_truth_scores = ground_truth_scores_a + ground_truth_scores_b
         # prediction_scores: np.ndarray = np.clip((np.array(prediction_scores) + 1) / 2, 0, 1)
         # prediction_scores = np.append(prediction_scores, np.zeros_like(ground_truth_scores_b)).tolist()
-        
+
         ground_truth_scores = ground_truth_scores_a
         prediction_scores: np.ndarray = np.clip((np.array(prediction_scores) + 1) / 2, 0, 1).tolist()
 
@@ -194,9 +196,9 @@ class SpeakerRecognitionEvaluator:
             # so that programs relying on result don't crash
             print(f"EER calculation had {e}")
             eer = 1
-            
+
         return eer
-        
+
 
     @classmethod
     def _compute_asnorm_prediction_scores(

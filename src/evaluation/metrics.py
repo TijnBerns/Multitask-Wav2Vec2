@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 
 from torchmetrics import SumMetric
 import torch
@@ -26,7 +27,7 @@ def _verify_correct_scores(
             f"groundtruth values should be either 0 and 1, while "
             f"they are actually one of {np.unique(groundtruth_scores)}"
         )
-        
+
 
 ################################################################################
 # EER (equal-error-rate)
@@ -56,7 +57,7 @@ def calculate_eer(
 ################################################################################
 # Speaker change metrics
 
-def _fnr(fn: SumMetric, spch: SumMetric) -> torch.tensor:   
+def _fnr(fn: SumMetric, spch: SumMetric) -> torch.tensor:
     """Computes false negative rate only considering speaker changes
 
     Returns:
@@ -98,7 +99,7 @@ class SpeakerChangeStats():
             self.prefix = ""
         else:
             self.prefix = f"{prefix}_"
-            
+
         self.processor = RemoveSpeakerChange()
 
     def __call__(self, preds: Union[str, List[str]], target: Union[str, List[str]]) -> None:
@@ -150,7 +151,7 @@ class SpeakerChangeStats():
             predictions = [predictions]
         if isinstance(targets, str):
             targets = [targets]
-            
+
         predictions_no_spch = self.processor(predictions)
         targets_no_spch = self.processor(targets)
 
@@ -158,7 +159,7 @@ class SpeakerChangeStats():
             # Compute operation counts
             prd, prd_no_spch = prd.split(), prd_no_spch.split()
             tgt, targets_no_spch = tgt.split(), targets_no_spch.split()
-            
+
             c, i, d, s, fn, fp = self._operation_counts(WER(tgt, prd).pralign())
 
             # Update stats

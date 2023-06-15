@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import sys
 sys.path.append('src')
 import click
@@ -31,16 +33,16 @@ def merge_dataset(dataset, dataset_str: str, num_samples: int) -> None:
 
 
 def transcribe_libri_clean():
-    
+
     for dataset_str, dataset in tqdm(datasets.clean_datasets.items(), desc="Writing transcriptions for clean datasets"):
         data.utils.write_trans_clean(dataset, dataset_str, Config.datapath + "/LibriSpeech")
-        
+
     trans_files = Path(Config.datapath).rglob("*trans.csv")
-    
+
     for trans_file in tqdm(trans_files, desc="Writing additional transcription files"):
         path = trans_file.parent
         name = trans_file.name[:-4]
-        
+
         data.utils.write_trans_from_source(source_trans=trans_file,
                                            target_trans=path / f"{name}-st.csv",
                                            trans_fn=data.utils.add_speaker_start)
