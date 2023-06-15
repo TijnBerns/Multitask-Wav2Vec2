@@ -9,8 +9,8 @@ class Config():
         self.job_id = job_id
 
     # Change the following two attributes to the path where data is stored or downloaded, and logs are saved to.
-    datapath: str = "/mnt/data00/audio/tijn"
-    logpath: str = "./logs"
+    datapath: str = "/scratch/tberns/asr/data"
+    logpath: str = "/home/tberns/Speaker_Change_Recognition/logs"
 
     sample_rate: int = 16_000
     seed: int = 0
