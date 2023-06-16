@@ -2,8 +2,8 @@
 
 ## Downloading the data and setting up the virtual environment
 
-- First, change `datapath` in [config.py](src/config.py) to the path you whish data to be downloaded.
-- Change `logpath` in [config.py](src/config.py) to the path you whish model checkpoints to be saved to.
+- First, change `datapath` in [config.py](src/config.py) to the path you wish data to be downloaded.
+- Change `logpath` in [config.py](src/config.py) to the path you wish model checkpoints to be saved to.
 - Run the following from the root directory of this project to create a virtual environment with all the required packages:\
 ```./scripts/setup_venv```
 - Run the following from the root directory of this project to download and preprocess the data (this may take some time):\
