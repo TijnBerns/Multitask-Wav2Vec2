@@ -124,8 +124,10 @@ def eval_asr(
         # Save speaker embeddings
         print(f"embeddings: {len(wav2vec2_module.embeddings)}")
         if len(wav2vec2_module.embeddings[0]) > 0:
+            embeddings_dir = Path("embeddings")
+            embeddings_dir.mkdir(parents=True, exist_ok=True)
             pickle.dump(wav2vec2_module.embeddings, open(
-                Path("embeddings") / f"{save_string}.{dataset_str}.embeddings.p", "wb"))
+                embeddings_dir / f"{save_string}.{dataset_str}.embeddings.p", "wb"))
 
         # Add additional information to results dict
         res["dataset"] = dataset_str
@@ -134,9 +136,12 @@ def eval_asr(
         all_res.append(res)
 
         # Write results to out files
-        utils.json_dump(path=Path("logs") / "measures" / f"{save_string}.res.json",
+        logs_dir = Path("logs")
+        for outdir in ["measures", "preds"]:
+            (logs_dir / outdir).mkdir(parents=True, exist_ok=True)
+        utils.json_dump(path=logs_dir / "measures" / f"{save_string}.res.json",
                         data=all_res)
-        utils.write_dict_list(path=Path("logs") / "preds" / f"{save_string}.{dataset_str}.preds.csv",
+        utils.write_dict_list(path=logs_dir / "preds" / f"{save_string}.{dataset_str}.preds.csv",
                               data=wav2vec2_module.test_preds)
 
         # Reset the saved embeddings and predictions
@@ -175,7 +180,7 @@ def eval_all(
         Path(f"embeddings").rglob(f"{version_number:0>7}*dev*"))
     test_embedding_files = list(
         Path(f"embeddings").rglob(f"{version_number:0>7}*test*"))
-   
+
     # Evaluate SPID for given version
     if len(dev_embedding_files) > 0:
         eer_dev = eval_spid(embedding_files=dev_embedding_files,
