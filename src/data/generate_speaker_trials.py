@@ -210,6 +210,7 @@ def generate_trials(
     )
 
     # write trials to file
+    save_path.parent.mkdir(parents=True, exist_ok=True)
     SpeakerTrial.to_file(save_path, trials)
 
 
