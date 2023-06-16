@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import click
 import utils
 import data.datasets as datasets
@@ -93,7 +95,7 @@ def main(checkpoint_path: str = None):
         # token_logits[token] = token_logits[token] / max(1, hit_counts[token])
         token_logits[token] = normalize_matrix(token_logits[token])
         plot_logit_matrix(token_logits[token], f"token-{token}-version-{ckpt_version}.png", f"argmax = {token}")
-    
+
     # all_logits = all_logits / token_count
     all_logits = normalize_matrix(all_logits)
     plot_logit_matrix(all_logits, f"logits-version-{ckpt_version}.png", "all logits")

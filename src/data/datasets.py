@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 
 from pickle import TRUE
 import torch
@@ -70,7 +71,7 @@ class LirbriSpeechBatch(object):
             self.keys,
             self.sample_paths
         )
-        
+
     def __len__(self):
         return len(self.keys)
 
@@ -82,7 +83,7 @@ def row_processor(row: str):
 def pad_collate(batch: Union[List[LirbriSpeechItem], LirbriSpeechItem]):
     if isinstance(batch, LirbriSpeechItem):
         batch = [batch]
-        
+
     return LirbriSpeechBatch(
         waveforms=pad_sequence(
             [sample.waveform.squeeze() for sample in batch], batch_first=True, padding_value=0),
@@ -154,7 +155,6 @@ def _get_split_index(dataset, start_index):
         speaker = dataset[split_index][3]
         split_index += 1
     return split_index
-
 
 train_tmp = torchaudio.datasets.LIBRISPEECH(
     root=Config.datapath, url="train-clean-100", download=True)

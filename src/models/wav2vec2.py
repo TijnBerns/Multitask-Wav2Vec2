@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from config import Config
 import utils
 from typing import List, Any, Dict, Tuple, Union, Optional, Set
@@ -87,14 +89,14 @@ class Wav2Vec2Module(pl.LightningModule):
         self.batch_size: int = batch_size
 
         # temporary attributes
-        
+
         self.size_mismatch_count = 0
-        
+
     def initMetrics(self, dataset_type):
         self.val_stats: SpeakerChangeStats = SpeakerChangeStats(prefix="val")
         self.test_stats: SpeakerChangeStats = SpeakerChangeStats(prefix=dataset_type)
         self.test_preds: List[Dict] = []
-        
+
 
     def forward(self, batch: LirbriSpeechBatch, **kwargs) -> CausalLMOutput:
         waveforms = batch.waveforms
@@ -120,7 +122,7 @@ class Wav2Vec2Module(pl.LightningModule):
 
     def training_step(self, batch: LirbriSpeechBatch, batch_idx):
         output = self.forward(batch)
-        
+
         self.log("train_loss", output.loss, batch_size=self.batch_size)
         return output.loss
 
@@ -152,7 +154,7 @@ class Wav2Vec2Module(pl.LightningModule):
                 "reference": trans,
                 "hypothesis": hyp
             })
-            
+
         # Update and log statistics
         self.test_stats(hypothesis, transcription)
         self.log("test_loss", output.loss, batch_size=self.batch_size)
@@ -167,7 +169,7 @@ class Wav2Vec2Module(pl.LightningModule):
 
             reconstruced_keys, embbeding_idx = utils.reconstruct_keys(
                 batch.keys[i])
-            
+
             if len(set(embbeding_idx)) != len(speaker_change_idx):
                 self.size_mismatch_count += 1
                 return output.loss
@@ -178,7 +180,7 @@ class Wav2Vec2Module(pl.LightningModule):
                     embedding = hidden_states.squeeze()[speaker_change_idx][j].to('cpu')
                     key = reconstruced_keys[j]
                     self.embeddings[k].append(EmbeddingSample(key, embedding))
-                
+
             self.embeddings_queue.extend(speaker_change_idx)
 
         return output.loss
@@ -257,7 +259,7 @@ class Wav2Vec2Module(pl.LightningModule):
 
     def reset_saves(self):
         self.embeddings = defaultdict(list)
-        self.test_preds = defaultdict(list) 
+        self.test_preds = defaultdict(list)
         return
 
     def _compute_mean_std_batch(self, all_tensors: List[torch.Tensor]):

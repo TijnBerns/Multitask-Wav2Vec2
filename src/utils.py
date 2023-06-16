@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from config import Config
 import os
 import torch
@@ -9,17 +11,17 @@ import itertools
 
 
 def reconstruct_keys(key: str) -> List[str]:
-    """ 
+    """
     Converts keys of in format 'ls/sp1&sp2/bk1&bk2/utt1&utt2',
     to a list of keys in format 'ls/sp1/bk1/utt1'.
 
     Example:
-        ls/1898&27&6848/145715&124992&76049/0017&0070&0016 
-        -> 
+        ls/1898&27&6848/145715&124992&76049/0017&0070&0016
+        ->
         ['ls/1898/145715/0017', 'ls/27/124992/0070', 'ls/6848/76049/0016']
     """
     keys = []
-    
+
     speaker_ids, book_ids, utterance_ids = key.split('/')[1:]
     for k in zip(speaker_ids.split('&'), book_ids.split('&'), utterance_ids.split('&')):
         # TODO: Fix keys when saving transcription files such that there are no leading zeros??
@@ -35,15 +37,15 @@ def get_embedding_idx(speaker_ids):
     res = []
     prev_id = None
     count = -1
-    
+
     for id in speaker_ids.split('&'):
         if id != prev_id:
             count += 1
         prev_id = id
         res.append(count)
-        
+
     return res
-    
+
 
 def json_dump(path: Union[str, Path], data: Any) -> None:
     with open(path, 'w') as f:

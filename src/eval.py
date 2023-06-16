@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import click
 import utils
 import data.datasets as data
@@ -40,7 +42,7 @@ def load_module(checkpoint_path: Optional[str], vocab_path: Optional[str]):
     if checkpoint_path is not None:
         wav2vec2_module = models.wav2vec2.Wav2Vec2Module.load_from_checkpoint(
             checkpoint_path, vocab_path=vocab_path)
-        ckpt_version = int(Path(checkpoint_path).parts[-3][-7:])
+        ckpt_version = int(Path(checkpoint_path).parent.parent.name.split('_')[1])
         prefix = Path(checkpoint_path).name.split('.')[-2]
     else:
         wav2vec2_module = models.wav2vec2.Wav2Vec2Module()
@@ -55,7 +57,7 @@ def load_module(checkpoint_path: Optional[str], vocab_path: Optional[str]):
 def eval_spid(embedding_files: List[str], trials_path):
     trials = SpeakerTrial.from_file(trials_path)
     eer_dict = defaultdict(list)
-    
+
     for hidden_state in range(12,13):
         len_dict = {}
 
@@ -64,7 +66,7 @@ def eval_spid(embedding_files: List[str], trials_path):
             embeddings = pickle.load(open(embedding_file, "rb"))[hidden_state]
             len_dict[embedding_file] = len(embeddings)
             keys.append(set([embedding.sample_id for embedding in embeddings]))
-        
+
         # Compute intersection of all keys
         try:
             keys_intersection = set.intersection(*keys)
@@ -183,8 +185,8 @@ def eval_all(
     save_string = f"{version_number:0>7}-{'best'}.{trans_file[:-4]}"
     utils.json_dump(path=Path("logs") / "measures" /
                     f"{save_string}.eer.json", data={"dev": eer_dev, "test": eer_test})
-    
-    
+
+
 def temp():
     long_sample = LirbriSpeechItem(
         file_name="/ceph/csedu-scratch/other/tberns/afjiv.wav",
