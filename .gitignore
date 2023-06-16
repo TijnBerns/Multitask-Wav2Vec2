@@ -4,6 +4,8 @@
 # models
 # /models
 logs
+/embeddings
+embeddings
 /logs
 venv
 /venv
