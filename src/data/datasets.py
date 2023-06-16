@@ -156,8 +156,7 @@ def _get_split_index(dataset, start_index):
         split_index += 1
     return split_index
 
-train_tmp = torchaudio.datasets.LIBRISPEECH(
-    root=Config.datapath, url="train-clean-100", download=True)
+train_tmp = torchaudio.datasets.LIBRISPEECH(root=Config.datapath, url="train-clean-100", download=True)
 train_set, val_set = split_dataset(train_tmp, Config.train_split)
 
 clean_datasets = {"train-clean-100": train_set,

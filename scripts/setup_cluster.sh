@@ -15,6 +15,9 @@ ln -sfn /ceph/csedu-scratch/other/"$USER"/lightning_logs "$SCRIPT_DIR"/../lightn
 mkdir -p /ceph/csedu-scratch/other/"$USER"/logs
 ln -sfn /ceph/csedu-scratch/other/"$USER"/logs "$SCRIPT_DIR"/../logs
 
+mkdir -p /ceph/csedu-scratch/other/"$USER"/embeddings
+ln -sfn /ceph/csedu-scratch/other/"$USER"/embeddings "$SCRIPT_DIR"/../embeddings
+
 mkdir -p /scratch/"$USER"/asr/data/trials
 ln -sfn /scratch/"$USER"/asr/data/trials "$SCRIPT_DIR"/../trials
 

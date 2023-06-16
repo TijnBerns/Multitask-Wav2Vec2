@@ -18,9 +18,12 @@ import click
 
 from tqdm import tqdm
 from torch.utils.data import DataLoader
+from config import Config
 
-from src.evaluation.evaluator import SpeakerTrial
-from data.datasets import CustomLibriSpeechDataset, LirbriSpeechItem
+from evaluation.evaluator import SpeakerTrial
+from data.datasets import LirbriSpeechItem, build_datapipe
+
+import torchaudio
 
 
 ########################################################################################
@@ -34,17 +37,13 @@ class WavAudioDataSampleTrialAggregator:
 
         self.map_sample_id_to_speaker_id = dict()
 
-    def __call__(self, x: LirbriSpeechItem):
-        assert isinstance(x, LirbriSpeechItem)
-
-        sample_id = x.key
+    def __call__(self, x: List[Any]):
+        sample_id = f"ls/{x[3]}/{x[4]}/{x[5]}"
 
         if sample_id in self.sample_ids:
             raise ValueError(f"non-unique {sample_id=}")
-        if x.speaker_id is None:
-            raise ValueError(f"{sample_id=} is missing speaker_id label")
 
-        speaker_id = x.speaker_id
+        speaker_id = str(x[3])
 
         self.sample_ids.add(sample_id)
         self.speaker_ids.add(speaker_id)
@@ -190,39 +189,13 @@ def _samples_per_speaker(
 # Entrypoint of CLI
 
 
-@click.command()
-@click.option(
-    "--trans_path",
-    type=str,
-    required=True,
-)
-@click.option(
-    "--out",
-    "save_path",
-    type=pathlib.Path,
-    required=True,
-    help="path to write trials to",
-)
-@click.option(
-    "--limit",
-    "limit_num_trials",
-    type=int,
-    default=None,
-    required=False,
-    help="if set, limit number of positive and negative trials to given number",
-)
-def main(
-    trans_path: Tuple[pathlib.Path],
+def generate_trials(
+    dataset: torchaudio.datasets.librispeech.LIBRISPEECH,
     save_path: pathlib.Path,
-    # ensure_same_sex_trials: bool,
-    limit_num_trials: int,
+    limit_num_trials: int=None,
 ):
-    # create dataset
-    ds = CustomLibriSpeechDataset(trans_path)
-
-    # loop over all samples in dataset
     ag = WavAudioDataSampleTrialAggregator()
-    for x in tqdm(DataLoader(ds, batch_size=None, num_workers=0)):
+    for x in tqdm(DataLoader(dataset, batch_size=None, num_workers=0)):
         ag(x)
 
     # collect data
@@ -241,4 +214,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main()
+    generate_trials()

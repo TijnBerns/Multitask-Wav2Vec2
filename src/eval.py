@@ -121,11 +121,11 @@ def eval_asr(
         trainer = pl.Trainer(log_every_n_steps=200, accelerator=device)
         res = trainer.test(model=wav2vec2_module, dataloaders=loader)[0]
 
-        # Evaluate speaker identification
+        # Save speaker embeddings
         print(f"embeddings: {len(wav2vec2_module.embeddings)}")
         if len(wav2vec2_module.embeddings[0]) > 0:
             pickle.dump(wav2vec2_module.embeddings, open(
-                Path("logs") / "embeddings" / f"{save_string}.{dataset_str}.embeddings.p", "wb"))
+                Path("embeddings") / f"{save_string}.{dataset_str}.embeddings.p", "wb"))
 
         # Add additional information to results dict
         res["dataset"] = dataset_str
@@ -172,40 +172,21 @@ def eval_all(
 
     # Get paths to best embeddings
     dev_embedding_files = list(
-        Path(f"logs/embeddings").rglob(f"{version_number}-best*dev*"))
+        Path(f"embeddings").rglob(f"{version_number}-best*dev*"))
     test_embedding_files = list(
-        Path(f"logs/embeddings").rglob(f"{version_number}-best*test*"))
+        Path(f"embeddings").rglob(f"{version_number}-best*test*"))
 
     # Evaluate SPID for given version
-    eer_dev = eval_spid(embedding_files=dev_embedding_files,
-                        trials_path=Path('/home/tberns/Speaker_Change_Recognition/trials/dev-clean.trials.txt'))
-    eer_test = eval_spid(embedding_files=test_embedding_files,
-                         trials_path=Path('/home/tberns/Speaker_Change_Recognition/trials/test-clean.trials.txt'))
+    if len(dev_embedding_files) > 0:
+        eer_dev = eval_spid(embedding_files=dev_embedding_files,
+                            trials_path=Path(Config.datapath) / 'trials/dev-clean.trials.txt')
+    if len(test_embedding_files) > 0:
+        eer_test = eval_spid(embedding_files=test_embedding_files,
+                            trials_path=Path(Config.datapath) / 'trials/test-clean.trials.txt')
 
     save_string = f"{version_number:0>7}-{'best'}.{trans_file[:-4]}"
     utils.json_dump(path=Path("logs") / "measures" /
                     f"{save_string}.eer.json", data={"dev": eer_dev, "test": eer_test})
-
-
-def temp():
-    long_sample = LirbriSpeechItem(
-        file_name="/ceph/csedu-scratch/other/tberns/afjiv.wav",
-        transcription=".",
-        speaker_id='t',
-        book_id='t',
-        utterance_id='t'
-    )
-    batch = pad_collate(long_sample)
-    checkpoint_path = "/home/tberns/Speaker_Change_Recognition/lightning_logs/version_2537373/checkpoints/epoch_0027.step_000074500.val-wer_0.0499.best.ckpt"
-    # checkpoint_path = "/home/tberns/Speaker_Change_Recognition/lightning_logs/version_2536477/checkpoints/epoch_0033.step_000095000.val-wer_0.0506.best.ckpt"
-    vocab_path = "/home/tberns/Speaker_Change_Recognition/src/models/vocab_spid.json"
-    wav2vec2_module, ckpt_version, checkpoint_path, prefix = load_module(
-        checkpoint_path, vocab_path)
-    output = wav2vec2_module.forward(batch)
-
-    logits = wav2vec2_module._preprocess_logits(output.logits)
-    hypothesis = wav2vec2_module._get_hypothesis(logits)
-    print(hypothesis)
 
 
 if __name__ == "__main__":

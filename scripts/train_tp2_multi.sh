@@ -4,10 +4,10 @@
 #SBATCH --qos=csedu-large
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=1
+#SBATCH --mem=10G
 #SBATCH --time=48:00:00
 #SBATCH --output=./logs/%J.out
 #SBATCH --error=./logs/%J.out
-
 project_dir=.
 
 # Train on train-full with speaker change symbols

@@ -7,7 +7,7 @@
 - Run the following from the root directory of this project to create a virtual environment with all the required packages:\
 ```./scripts/setup_venv```
 - Run the following from the root directory of this project to download and preprocess the data (this may take some time):\
-```python src/data/dataprep.py --merge=True --transcribe=True --create_vocabs=True```
+```python src/data/dataprep.py --merge=True --transcribe=True --create_vocabs=True --create_trials=True```
 
 
 ## Training the wav2vec2 network

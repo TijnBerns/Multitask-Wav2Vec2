@@ -11,6 +11,8 @@ import data.datasets as datasets
 import data.utils
 from data.generate_merged_samples import PairGeneratorRepeat, PairGeneratorNoRepeat
 from tqdm import tqdm
+import generate_speaker_trials
+
 
 
 def merge_dataset(dataset, dataset_str: str, num_samples: int) -> None:
@@ -58,7 +60,8 @@ def transcribe_libri_clean():
 @click.option("--merge", default=False)
 @click.option("--transcribe", default=False)
 @click.option("--create_vocabs", default=False)
-def main(merge: bool, transcribe: bool, create_vocabs: bool):
+@click.option("--create_trials", default=False)
+def main(merge: bool, transcribe: bool, create_vocabs: bool, create_trials: bool):
     # Merge datasets
     if merge:
         for dataset, dataset_str, num_samples in [
@@ -78,6 +81,13 @@ def main(merge: bool, transcribe: bool, create_vocabs: bool):
     if create_vocabs:
         data.utils.write_speaker_id_vocab(dataset=datasets.clean_datasets["train-clean-100"],
                                           spid_vocab_path="src/models/vocab_spid.json",)
+        
+    if create_trials:
+        dev =  datasets.clean_datasets["test-clean"]
+        test = datasets.clean_datasets["test-clean"]
+        generate_speaker_trials.generate_trials(dataset=dev, save_path=Path(Config.datapath) / 'trials/dev-clean.trials.txt')
+        generate_speaker_trials.generate_trials(dataset=test, save_path=Path(Config.datapath) / 'trials/test-clean.trials.txt')
+
 
 
 if __name__ == "__main__":
