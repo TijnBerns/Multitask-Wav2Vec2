@@ -83,7 +83,7 @@ def main(merge: bool, transcribe: bool, create_vocabs: bool, create_trials: bool
                                           spid_vocab_path="src/models/vocab_spid.json",)
         
     if create_trials:
-        dev =  datasets.clean_datasets["test-clean"]
+        dev =  datasets.clean_datasets["dev-clean"]
         test = datasets.clean_datasets["test-clean"]
         generate_speaker_trials.generate_trials(dataset=dev, save_path=Path(Config.datapath) / 'trials/dev-clean.trials.txt')
         generate_speaker_trials.generate_trials(dataset=test, save_path=Path(Config.datapath) / 'trials/test-clean.trials.txt')

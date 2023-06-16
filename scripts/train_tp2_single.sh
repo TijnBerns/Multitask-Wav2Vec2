@@ -13,7 +13,7 @@ project_dir=.
 
 # Train on train-clean-100 with speaker change at start
 source "$project_dir"/venv/bin/activate
-python "$project_dir"/src/train.py \
+srun python "$project_dir"/src/train.py \
     --vocab_path=src/models/vocab_spch.json \
     --train_trans=/scratch/tberns/asr/data/LibriSpeech/train-clean-100.trans-st.csv \
     --val_trans=/scratch/tberns/asr/data/LibriSpeech/val-clean.trans-st.csv \

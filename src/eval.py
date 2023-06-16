@@ -172,10 +172,10 @@ def eval_all(
 
     # Get paths to best embeddings
     dev_embedding_files = list(
-        Path(f"embeddings").rglob(f"{version_number}-best*dev*"))
+        Path(f"embeddings").rglob(f"{version_number:0>7}*dev*"))
     test_embedding_files = list(
-        Path(f"embeddings").rglob(f"{version_number}-best*test*"))
-
+        Path(f"embeddings").rglob(f"{version_number:0>7}*test*"))
+   
     # Evaluate SPID for given version
     if len(dev_embedding_files) > 0:
         eer_dev = eval_spid(embedding_files=dev_embedding_files,
@@ -184,9 +184,10 @@ def eval_all(
         eer_test = eval_spid(embedding_files=test_embedding_files,
                             trials_path=Path(Config.datapath) / 'trials/test-clean.trials.txt')
 
-    save_string = f"{version_number:0>7}-{'best'}.{trans_file[:-4]}"
-    utils.json_dump(path=Path("logs") / "measures" /
-                    f"{save_string}.eer.json", data={"dev": eer_dev, "test": eer_test})
+    if len(test_embedding_files) > 0 and len(dev_embedding_files) > 0:
+        save_string = f"{version_number:0>7}-{'best'}.{trans_file[:-4]}"
+        utils.json_dump(path=Path("logs") / "measures" /
+                        f"{save_string}.eer.json", data={"dev": eer_dev, "test": eer_test})
 
 
 if __name__ == "__main__":

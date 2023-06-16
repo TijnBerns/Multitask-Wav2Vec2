@@ -160,7 +160,9 @@ class SpeakerRecognitionEvaluator:
                 prediction_pairs.append((s1, s2))
             else:
                 ground_truth_scores_b.append(gt)
-
+        
+        assert len(ground_truth_scores_a) > 0, 'No trials for extracted embeddings'
+                
         if cohort is not None:
             prediction_scores = cls._compute_asnorm_prediction_scores(
                 prediction_pairs,

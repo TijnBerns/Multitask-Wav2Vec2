@@ -13,7 +13,7 @@ project_dir=.
 
 # Train on train-full with no speaker change symbols or ids
 source "$project_dir"/venv/bin/activate
-python "$project_dir"/src/train.py \
+srun python "$project_dir"/src/train.py \
     --vocab_path=/home/tberns/Speaker_Change_Recognition/src/models/vocab_base.json \
     --train_trans=/scratch/tberns/asr/data/train-clean-100-no-rep/trans.csv \
     --train_trans=/scratch/tberns/asr/data/train-clean-100-rep/trans.csv \

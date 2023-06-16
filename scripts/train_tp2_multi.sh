@@ -12,7 +12,7 @@ project_dir=.
 
 # Train on train-full with speaker change symbols
 source "$project_dir"/venv/bin/activate
-python "$project_dir"/src/train.py \
+srun python "$project_dir"/src/train.py \
     --vocab_path=src/models/vocab_spch.json \
     --train_trans=/scratch/tberns/asr/data/train-clean-100-no-rep/trans-st.csv \
     --train_trans=/scratch/tberns/asr/data/train-clean-100-rep/trans-st.csv \

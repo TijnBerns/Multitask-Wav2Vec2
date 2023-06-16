@@ -76,11 +76,10 @@ def main(train_trans: Union[List[str], str, None], val_trans: Union[List[str], s
     wav2vec2_module.configure_optimizers()
 
     # Second stage
-    lr_monitor = LearningRateMonitor(logging_interval='step')
     second_stage = pl.Trainer(max_steps=Config.num_steps_stage_two,
                               accelerator=device,
-                              callbacks=[checkpointer, lr_monitor],
-                              log_every_n_steps=5,
+                              callbacks=[checkpointer],
+                              log_every_n_steps=50,
                               accumulate_grad_batches=Config.effective_batch_size
                               )
     second_stage.fit(model=wav2vec2_module,

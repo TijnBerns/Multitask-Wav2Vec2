@@ -6,13 +6,12 @@ cd "$SCRIPT_DIR" || exit 1
 
 # make a directory on the ceph file system to store logs and checkpoints
 # and make a symlink to access it directly from the root of the project
-mkdir -p /ceph/csedu-scratch/other/"$USER"/checkpoints
-ln -sfn /ceph/csedu-scratch/other/"$USER"/checkpoints "$SCRIPT_DIR"/../checkpoints
-
 mkdir -p /ceph/csedu-scratch/other/"$USER"/lightning_logs
 ln -sfn /ceph/csedu-scratch/other/"$USER"/lightning_logs "$SCRIPT_DIR"/../lightning_logs
 
 mkdir -p /ceph/csedu-scratch/other/"$USER"/logs
+mkdir -p /ceph/csedu-scratch/other/"$USER"/logs/measures
+mkdir -p /ceph/csedu-scratch/other/"$USER"/logs/preds
 ln -sfn /ceph/csedu-scratch/other/"$USER"/logs "$SCRIPT_DIR"/../logs
 
 mkdir -p /ceph/csedu-scratch/other/"$USER"/embeddings
