@@ -1,5 +1,20 @@
 # Multi-task Wav2Vec2
 
+## Abstract
+
+This research explores the diversity of the Wav2Vec2 network by
+fine-tuning it to perform three distinctive speech related tasks. The
+tasks we consider are automatic speech recognition (ASR), speaker-
+change detection, and speaker recognition. Our approach relies on
+the introduction of speaker-change tokens or speaker-identity tokens 
+to the target transcriptions during network fine-tuning. In this
+work, we introduce a method for extracting speaker embeddings
+from the Wav2Vec2 network, and show that our approach allows
+the model to perform the three distinctive tasks on an artificially
+created multi-utterance dataset. Additionally, we show that the
+introduction of the tokens during network fine-tuning is beneficial
+for the ASR performance.
+
 ## Downloading the data and setting up the virtual environment
 
 - First, change `datapath` in [config.py](src/config.py) to the path you wish data to be downloaded.
